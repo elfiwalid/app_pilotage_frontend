@@ -11,6 +11,7 @@ import { Simulation } from './pages/Simulation';
 import { Settings } from './pages/Settings';
 import { RmProfile } from './pages/rm/Profile';
 import { RmNotifications } from './pages/rm/Notifications';
+import { Import } from './pages/Import';
 
 // PM Pages
 import { PmDashboard } from './pages/pm/Dashboard';
@@ -38,6 +39,7 @@ export const router = createBrowserRouter(
         { index: true, Component: RmDashboard },
         { path: 'resources', Component: Resources },
         { path: 'projects', Component: Projects },
+        { path: 'import', Component: Import },
         { path: 'conflicts', Component: Conflicts },
         { path: 'simulation', Component: Simulation },
         { path: 'settings', Component: Settings },
