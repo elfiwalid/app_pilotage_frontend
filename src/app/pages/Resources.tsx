@@ -1,23 +1,13 @@
-import { useState } from 'react';
-import { Search, UserPlus, Edit3, Clock, CheckCircle, ChevronRight } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, UserPlus, Edit3, Clock, CheckCircle, ChevronRight, Loader2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { C, S, R, PageHeader, SectionCard, BtnPrimary, BtnSecondary, BtnGhost, Avatar, Modal, ModalHeader, SectionLabel, thStyle, tdStyle, cardStyle } from '../components/ui/design-system';
+import { fetchUsers, UserResponseDTO } from '../services/userService';
 
 /* ─── DATA ─────────────────────────────────────── */
-// 12 months of heatmap data (Jan–Dec)
-const resources = [
-  { id: 1, name: 'Youssef El Amrani', email: 'youssef.elamrani@soprabanking.com', role: 'Architecte Solution', util: 95, projects: ['Alpha', 'Beta'], heatmap: [90, 92, 95, 93, 95, 94, 92, 91, 93, 95, 94, 92], planning: [{ p: 'Projet Alpha', alloc: 55, color: C.purple }, { p: 'Projet Beta', alloc: 40, color: C.blue }] },
-  { id: 2, name: 'Sara Benali', email: 'sara.benali@soprabanking.com', role: 'Data Scientist', util: 82, projects: ['Delta'], heatmap: [78, 80, 82, 85, 82, 82, 80, 78, 82, 83, 82, 81], planning: [{ p: 'Projet Delta', alloc: 82, color: C.green }] },
-  { id: 3, name: 'Mohamed Alaoui', email: 'mohamed.alaoui@soprabanking.com', role: 'Lead Dev Backend', util: 110, projects: ['Iota', 'Kappa'], heatmap: [100, 105, 110, 108, 110, 112, 108, 106, 110, 112, 110, 108], planning: [{ p: 'Projet Iota', alloc: 60, color: C.purple }, { p: 'Projet Kappa', alloc: 50, color: C.red }] },
-  { id: 4, name: 'Salma Idrissi', email: 'salma.idrissi@soprabanking.com', role: 'Business Analyst', util: 75, projects: ['Gamma'], heatmap: [70, 72, 75, 75, 73, 78, 76, 74, 75, 77, 75, 73], planning: [{ p: 'Projet Gamma', alloc: 75, color: '#F59E0B' }] },
-  { id: 5, name: 'Ahmed Chafik', email: 'ahmed.chafik@soprabanking.com', role: 'Lead Dev', util: 100, projects: ['Epsilon', 'Zeta'], heatmap: [95, 98, 100, 100, 100, 100, 98, 97, 100, 100, 99, 98], planning: [{ p: 'Projet Epsilon', alloc: 55, color: C.green }, { p: 'Projet Zeta', alloc: 45, color: '#8B5CF6' }] },
-  { id: 6, name: 'Imane El Fassi', email: 'imane.elfassi@soprabanking.com', role: 'ML Engineer', util: 65, projects: ['Lambda'], heatmap: [60, 62, 65, 65, 68, 65, 67, 66, 65, 68, 66, 65], planning: [{ p: 'Projet Lambda', alloc: 65, color: C.blue }] },
-  { id: 7, name: 'Hamza Lahlou', email: 'hamza.lahlou@soprabanking.com', role: 'Data Analyst', util: 40, projects: ['Theta'], heatmap: [35, 38, 40, 42, 40, 40, 41, 39, 40, 42, 40, 38], planning: [{ p: 'Projet Theta', alloc: 40, color: '#F59E0B' }] },
-];
-
-// Heatmap period configs
+// Legend/Heatmap period configs
 const V2_MONTHS = ['Jan', 'Fév', 'Mar'];           // indices 0–2
 const V2A_MONTHS = ['Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']; // indices 3–11
 
@@ -29,8 +19,19 @@ const getStatus = (v: number) => v > 100
 
 const AVATAR_COLORS = [C.purple, C.blue, C.green, C.magenta, '#F59E0B', C.cyan, '#8B5CF6'];
 
+interface ResourceItem {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  util: number;
+  projects: string[];
+  heatmap: number[];
+  planning: { p: string; alloc: number; color: string }[];
+}
+
 /* ─── RESOURCE MODAL (merged: Profile + Planning + Modifier) ── */
-function ResourceModal({ resource, onClose }: { resource: typeof resources[0]; onClose: () => void }) {
+function ResourceModal({ resource, onClose }: { resource: ResourceItem; onClose: () => void }) {
   const [tab, setTab] = useState<'profile' | 'planning' | 'modifier'>('profile');
   const st = getStatus(resource.util);
   const [allocValues, setAllocValues] = useState<Record<string, number>>(
@@ -76,12 +77,16 @@ function ResourceModal({ resource, onClose }: { resource: typeof resources[0]; o
               </div>
               <div>
                 <SectionLabel>Projets en cours</SectionLabel>
-                {resource.planning.map((p, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', borderRadius: R, border: `1px solid ${C.border}`, borderLeft: `3px solid ${p.color}`, marginBottom: '6px' }}>
-                    <span style={{ fontSize: '12px', color: C.text, flex: 1, fontWeight: 600 }}>{p.p}</span>
-                    <span style={{ fontSize: '13px', fontWeight: 700, color: p.color }}>{p.alloc}%</span>
-                  </div>
-                ))}
+                {resource.planning.length > 0 ? (
+                  resource.planning.map((p, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', borderRadius: R, border: `1px solid ${C.border}`, borderLeft: `3px solid ${p.color}`, marginBottom: '6px' }}>
+                      <span style={{ fontSize: '12px', color: C.text, flex: 1, fontWeight: 600 }}>{p.p}</span>
+                      <span style={{ fontSize: '13px', fontWeight: 700, color: p.color }}>{p.alloc}%</span>
+                    </div>
+                  ))
+                ) : (
+                  <p style={{ fontSize: '12px', color: C.textMuted, textAlign: 'center', padding: '10px' }}>Aucun projet assigné</p>
+                )}
               </div>
             </>
           )}
@@ -149,8 +154,38 @@ export function Resources() {
   const [view, setView] = useState<'table' | 'heatmap'>('table');
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
-  const [modal, setModal] = useState<typeof resources[0] | null>(null);
+  const [modal, setModal] = useState<ResourceItem | null>(null);
   const [heatmapPeriod, setHeatmapPeriod] = useState<'v2' | 'v2annual'>('v2');
+  
+  const [resources, setResources] = useState<ResourceItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadResources();
+  }, []);
+
+  async function loadResources() {
+    setLoading(true);
+    try {
+      const data = await fetchUsers();
+      // Map backend UserResponseDTO to frontend ResourceItem
+      const mapped: ResourceItem[] = data.map(u => ({
+        id: u.id,
+        name: `${u.prenom} ${u.nom}`,
+        email: u.email,
+        role: u.poste || 'Collaborateur',
+        util: u.tauxStaffing || 0,
+        projects: [], // Will be populated in Phase 2
+        heatmap: Array(12).fill(u.tauxStaffing || 0), // Mock heatmap from staffing rate
+        planning: [], // Will be populated in Phase 1 (Staffing)
+      }));
+      setResources(mapped);
+    } catch (err: any) {
+      toast.error("Erreur lors du chargement des collaborateurs");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const filtered = resources.filter(r => {
     const match = r.name.toLowerCase().includes(search.toLowerCase()) || r.role.toLowerCase().includes(search.toLowerCase());
@@ -252,7 +287,12 @@ export function Resources() {
         </div>
 
         {/* TABLE VIEW */}
-        {view === 'table' ? (
+        {loading ? (
+          <div style={{ padding: '60px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+            <Loader2 style={{ width: '32px', height: '32px', color: C.purple, animation: 'spin 1s linear infinite' }} />
+            <p style={{ fontSize: '13px', color: C.textMuted, fontWeight: 500 }}>Chargement des collaborateurs…</p>
+          </div>
+        ) : view === 'table' ? (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>

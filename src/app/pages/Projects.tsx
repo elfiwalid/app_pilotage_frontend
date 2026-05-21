@@ -1,93 +1,165 @@
-import { useState } from 'react';
-import { Search, Filter, Users, Calendar, X, Clock, User, Download, CheckCircle, AlertCircle, RefreshCw, ChevronRight } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, Filter, Users, Calendar, X, Clock, User, Download, CheckCircle, AlertCircle, RefreshCw, ChevronRight, UserPlus, Loader2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { toast } from 'sonner';
-import { C, S, R, PageHeader, SectionCard, BtnPrimary, BtnGhost, Avatar, Modal, ModalHeader, SectionLabel, thStyle, tdStyle, cardStyle } from '../components/ui/design-system';
+import { C, S, R, PageHeader, SectionCard, BtnPrimary, BtnSecondary, BtnGhost, Avatar, Modal, ModalHeader, SectionLabel, thStyle, tdStyle, cardStyle } from '../components/ui/design-system';
+import { fetchMesProjets, ProjetResponseDTO } from '../services/projetService';
+import { fetchUsers, UserResponseDTO } from '../services/userService';
+import { creerAffectation, fetchAffectationsParProjet, AffectationResponseDTO } from '../services/affectationService';
 
-/* ─── DATA ─────────────────────────────────────── */
-const projectsData = [
-  { id: 1, name: 'Projet Alpha', manager: 'Fatima Zahra Bennis', status: 'en-cours', start: new Date(2026, 0, 15), end: new Date(2026, 5, 30), team: [{ name: 'Youssef El Amrani', role: 'Architecte Solution', alloc: 55 }, { name: 'Salma Idrissi', role: 'Dev Junior', alloc: 75 }, { name: 'Ahmed Chafik', role: 'Lead Dev', alloc: 60 }, { name: 'Khadija Tazi', role: 'QA Engineer', alloc: 50 }], completion: 65, description: "Développement d'une plateforme innovante pour l'automatisation des processus internes. Réduction des délais de mise en production de 40% grâce aux pipelines CI/CD." },
-  { id: 2, name: 'Projet Beta', manager: 'Khalid Bennani', status: 'en-cours', start: new Date(2026, 1, 1), end: new Date(2026, 4, 15), team: [{ name: 'Youssef El Amrani', role: 'Tech Lead', alloc: 40 }, { name: 'Sara Benali', role: 'Data Engineer', alloc: 82 }, { name: 'Karim Nassiri', role: 'Analyste', alloc: 75 }], completion: 82, description: "Migration et optimisation de la plateforme analytique. Intégration de modules de reporting en temps réel." },
-  { id: 3, name: 'Projet Gamma', manager: 'Amina Tazi', status: 'planifie', start: new Date(2026, 3, 1), end: new Date(2026, 7, 31), team: [{ name: 'Youssef El Amrani', role: 'Architecte', alloc: 40 }, { name: 'Hamza Lahlou', role: 'Dev Backend', alloc: 40 }, { name: 'Salma Idrissi', role: 'Business Analyst', alloc: 75 }], completion: 15, description: "Refonte complète du système de gestion. Migration vers une architecture microservices cloud-native." },
-  { id: 4, name: 'Projet Delta', manager: 'Omar El Alami', status: 'en-cours', start: new Date(2026, 2, 15), end: new Date(2026, 5, 15), team: [{ name: 'Sara Benali', role: 'Data Scientist', alloc: 82 }, { name: 'Imane El Fassi', role: 'ML Engineer', alloc: 65 }, { name: 'Youssef Alami', role: 'Dev Python', alloc: 60 }], completion: 58, description: "R&D sur des modèles d'IA pour la prédiction des comportements clients." },
-  { id: 5, name: 'Projet Epsilon', manager: 'Nadia Chraibi', status: 'termine', start: new Date(2025, 10, 1), end: new Date(2026, 2, 31), team: [{ name: 'Sara Benali', role: 'Lead Dev', alloc: 100 }, { name: 'Ahmed Chafik', role: 'Dev Senior', alloc: 55 }, { name: 'Fatima Zahra Berrada', role: 'Testeur', alloc: 80 }], completion: 100, description: "Implémentation du module de paiement instantané conforme aux normes bancaires." },
-  { id: 6, name: 'Projet Zeta', manager: 'Houda Lahlou', status: 'planifie', start: new Date(2026, 4, 1), end: new Date(2026, 9, 31), team: [{ name: 'Hamza Lahlou', role: 'Data Analyst', alloc: 40 }, { name: 'Hana El Fassi', role: 'Visualisation', alloc: 80 }], completion: 5, description: "Tableau de bord analytique avancé pour le suivi des performances commerciales en temps réel." },
-];
+/* ─── STAFFING MODAL (Add someone to project) ───── */
+function StaffingModal({ project, users, onClose, onRefresh }: { project: ProjetResponseDTO; users: UserResponseDTO[]; onClose: () => void; onRefresh: () => void }) {
+  const [loading, setLoading] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<string>('');
+  const [dateDebut, setDateDebut] = useState(project.dateDebut);
+  const [dateFin, setDateFin] = useState(project.dateFin);
+  const [taux, setTaux] = useState(100);
+  const [role, setRole] = useState('');
 
-const STATUS: Record<string, { label: string; bg: string; text: string; border: string; dot: string; accent: string }> = {
-  'en-cours': { label: 'En cours', bg: '#EFF6FF', text: '#1D4ED8', border: '#BFDBFE', dot: C.blue, accent: C.purple },
-  planifie: { label: 'Planifié', bg: '#FFFBEB', text: '#92400E', border: '#FDE68A', dot: '#F59E0B', accent: '#F59E0B' },
-  termine: { label: 'Terminé', bg: '#ECFDF5', text: '#065F46', border: '#A7F3D0', dot: C.green, accent: C.green },
-};
-
-const ALLOC_COLOR = (v: number) => v >= 100 ? C.red : v >= 80 ? '#F59E0B' : C.green;
-const AVATAR_COLORS = [C.purple, C.blue, C.green, C.magenta, '#F59E0B', C.cyan];
-
-/* ─── DETAIL MODAL ──────────────────────────────── */
-function ProjectModal({ project, onClose }: { project: typeof projectsData[0]; onClose: () => void }) {
-  const sc = STATUS[project.status];
-  const duration = Math.ceil((project.end.getTime() - project.start.getTime()) / (1000 * 60 * 60 * 24 * 30));
+  const handleSubmit = async () => {
+    if (!selectedUser) return toast.error("Veuillez choisir un collaborateur");
+    setLoading(true);
+    try {
+      await creerAffectation({
+        projetId: project.id,
+        collaborateurId: Number(selectedUser),
+        dateDebut,
+        dateFin,
+        tauxAffectation: taux,
+        roleDansProjet: role
+      });
+      toast.success("Affectation réussie !");
+      onRefresh();
+      onClose();
+    } catch (err: any) {
+      toast.error(err.message || "Erreur lors de l'affectation");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <Modal onClose={onClose} maxWidth="640px" accentColor={sc.accent}>
-      <ModalHeader title={project.name} subtitle={`Chef de projet : ${project.manager}`} onClose={onClose} />
+    <Modal onClose={onClose} accentColor={C.purple} maxWidth="480px">
+      <ModalHeader title="Affecter un collaborateur" subtitle={`Projet : ${project.nom}`} onClose={onClose} />
       <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-        {/* Status + Meta */}
+        <div>
+          <SectionLabel>Collaborateur</SectionLabel>
+          <Select value={selectedUser} onValueChange={setSelectedUser}>
+            <SelectTrigger style={{ width: '100%', fontSize: '13px', height: '38px' }}><SelectValue placeholder="Choisir un collaborateur..." /></SelectTrigger>
+            <SelectContent>
+              {users.map(u => (
+                <SelectItem key={u.id} value={String(u.id)}>{u.prenom} {u.nom} ({u.poste})</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div>
+            <SectionLabel>Du</SectionLabel>
+            <input type="date" value={dateDebut} onChange={e => setDateDebut(e.target.value)} 
+              style={{ width: '100%', padding: '8px', fontSize: '12px', border: `1px solid ${C.border}`, borderRadius: R, outline: 'none' }} />
+          </div>
+          <div>
+            <SectionLabel>Au</SectionLabel>
+            <input type="date" value={dateFin} onChange={e => setDateFin(e.target.value)} 
+              style={{ width: '100%', padding: '8px', fontSize: '12px', border: `1px solid ${C.border}`, borderRadius: R, outline: 'none' }} />
+          </div>
+        </div>
+
+        <div>
+          <SectionLabel>Taux d'affectation (%)</SectionLabel>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <input type="range" min="10" max="100" step="5" value={taux} onChange={e => setTaux(Number(e.target.value))} 
+              style={{ flex: 1, accentColor: C.purple }} />
+            <span style={{ fontSize: '14px', fontWeight: 800, color: C.purple, width: '40px' }}>{taux}%</span>
+          </div>
+        </div>
+
+        <div>
+          <SectionLabel>Rôle sur le projet</SectionLabel>
+          <input type="text" value={role} onChange={e => setRole(e.target.value)} placeholder="Ex: Lead Dev, Expert technique..."
+            style={{ width: '100%', padding: '8px', fontSize: '12px', border: `1px solid ${C.border}`, borderRadius: R, outline: 'none' }} />
+        </div>
+
+        <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+          <BtnGhost onClick={onClose} style={{ flex: 1 }}>Annuler</BtnGhost>
+          <BtnPrimary onClick={handleSubmit} disabled={loading} style={{ flex: 1 }}>
+            {loading ? <Loader2 style={{ width: '14px', height: '14px', animation: 'spin 1s linear infinite' }} /> : 'Confirmer'}
+          </BtnPrimary>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+/* ─── DETAIL MODAL ──────────────────────────────── */
+function ProjectModal({ project, onClose, onStaffing }: { project: ProjetResponseDTO; onClose: () => void; onStaffing: () => void }) {
+  const [affectations, setAffectations] = useState<AffectationResponseDTO[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadAffectations();
+  }, [project.id]);
+
+  async function loadAffectations() {
+    try {
+      const data = await fetchAffectationsParProjet(project.id);
+      setAffectations(data);
+    } catch (err) {
+      toast.error("Impossible de charger l'équipe");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const start = parseISO(project.dateDebut || new Date().toISOString());
+  const end = parseISO(project.dateFin || new Date().toISOString());
+  const duration = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 30));
+
+  return (
+    <Modal onClose={onClose} maxWidth="640px" accentColor={C.purple}>
+      <ModalHeader title={project.nom} subtitle={`Chef de projet : ${project.chefProjetNomComplet}`} onClose={onClose} />
+      <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: '3px', backgroundColor: sc.bg, border: `1px solid ${sc.border}`, color: sc.text, display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: sc.dot, display: 'inline-block' }} />
-            {sc.label}
-          </span>
-          <span style={{ fontSize: '11px', color: C.textMuted, display: 'flex', alignItems: 'center', gap: '4px' }}><Calendar style={{ width: '12px', height: '12px' }} />{format(project.start, 'dd MMM yyyy', { locale: fr })} → {format(project.end, 'dd MMM yyyy', { locale: fr })}</span>
+          <span style={{ fontSize: '11px', color: C.textMuted, display: 'flex', alignItems: 'center', gap: '4px' }}><Calendar style={{ width: '12px', height: '12px' }} />{format(start, 'dd MMM yyyy', { locale: fr })} → {format(end, 'dd MMM yyyy', { locale: fr })}</span>
           <span style={{ fontSize: '11px', color: C.textMuted, display: 'flex', alignItems: 'center', gap: '4px' }}><Clock style={{ width: '12px', height: '12px' }} />{duration} mois</span>
-          <span style={{ fontSize: '11px', color: C.textMuted, display: 'flex', alignItems: 'center', gap: '4px' }}><Users style={{ width: '12px', height: '12px' }} />{project.team.length} membres</span>
         </div>
 
-        {/* Description */}
-        <div style={{ padding: '10px 14px', backgroundColor: C.bg, borderRadius: R, border: `1px solid ${C.border}` }}>
-          <p style={{ fontSize: '12px', color: C.textSecondary, lineHeight: 1.6 }}>{project.description}</p>
-        </div>
-
-        {/* Progress */}
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-            <p style={{ fontSize: '12px', fontWeight: 600, color: C.text }}>Avancement global</p>
-            <p style={{ fontSize: '14px', fontWeight: 800, color: sc.accent }}>{project.completion}%</p>
+        {project.description && (
+          <div style={{ padding: '10px 14px', backgroundColor: C.bg, borderRadius: R, border: `1px solid ${C.border}` }}>
+            <p style={{ fontSize: '12px', color: C.textSecondary, lineHeight: 1.6 }}>{project.description}</p>
           </div>
-          <div style={{ height: '8px', borderRadius: '4px', backgroundColor: C.borderLight, overflow: 'hidden' }}>
-            <div style={{ height: '100%', borderRadius: '4px', backgroundColor: sc.accent, width: `${project.completion}%`, transition: 'width 0.5s' }} />
-          </div>
-        </div>
+        )}
 
-        {/* Team */}
         <div>
-          <SectionLabel>Équipe projet · {project.team.length} collaborateurs</SectionLabel>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+            <SectionLabel>Équipe projet · {affectations.length} membres</SectionLabel>
+            <BtnSecondary small onClick={onStaffing}><UserPlus style={{ width: '11px', height: '11px' }} /> Staffer</BtnSecondary>
+          </div>
+          
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {project.team.map((m, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', borderRadius: R, border: `1px solid ${C.border}`, transition: 'background 0.1s' }}
-                onMouseEnter={e => (e.currentTarget.style.backgroundColor = C.bg)}
-                onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#fff')}
-              >
-                <Avatar name={m.name} color={AVATAR_COLORS[i % AVATAR_COLORS.length]} size={26} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontSize: '12px', fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</p>
-                  <p style={{ fontSize: '10px', color: C.textMuted }}>{m.role}</p>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                  <div style={{ width: '64px', height: '4px', borderRadius: '2px', backgroundColor: C.borderLight, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', borderRadius: '2px', backgroundColor: ALLOC_COLOR(m.alloc), width: `${Math.min(m.alloc, 100)}%` }} />
+            {loading ? (
+              <div style={{ padding: '20px', textAlign: 'center' }}><Loader2 style={{ width: '20px', height: '20px', animation: 'spin 1s linear infinite', margin: '0 auto' }} /></div>
+            ) : affectations.length > 0 ? (
+              affectations.map((m, i) => (
+                <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', borderRadius: R, border: `1px solid ${C.border}` }}>
+                  <Avatar name={m.collaborateurNomComplet} color={C.purple} size={26} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: '12px', fontWeight: 600, color: C.text }}>{m.collaborateurNomComplet}</p>
+                    <p style={{ fontSize: '10px', color: C.textMuted }}>{m.roleDansProjet || 'Collaborateur'}</p>
                   </div>
-                  <span style={{ fontSize: '11px', fontWeight: 700, color: ALLOC_COLOR(m.alloc), minWidth: '30px', textAlign: 'right' }}>{m.alloc}%</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 800, color: C.purple }}>{m.tauxAffectation}%</span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p style={{ fontSize: '11px', color: C.textMuted, textAlign: 'center', padding: '10px' }}>Aucun collaborateur staffé pour le moment.</p>
+            )}
           </div>
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '8px', borderTop: `1px solid ${C.borderLight}` }}>
-          <BtnGhost onClick={onClose}>Fermer</BtnGhost>
         </div>
       </div>
     </Modal>
@@ -98,37 +170,44 @@ function ProjectModal({ project, onClose }: { project: typeof projectsData[0]; o
 export function Projects() {
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
-  const [selected, setSelected] = useState<typeof projectsData[0] | null>(null);
-  const [exporting, setExporting] = useState(false);
+  const [selected, setSelected] = useState<ProjetResponseDTO | null>(null);
+  const [staffingFor, setStaffingFor] = useState<ProjetResponseDTO | null>(null);
+  
+  const [projects, setProjects] = useState<ProjetResponseDTO[]>([]);
+  const [users, setUsers] = useState<UserResponseDTO[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const doExport = () => {
-    setExporting(true);
-    toast.loading('Génération du V2 Consolidé…', { id: 'v2' });
-    setTimeout(() => { setExporting(false); toast.success('Fichier V2 Consolidé exporté !', { id: 'v2' }); }, 2000);
-  };
+  useEffect(() => {
+    loadData();
+  }, []);
 
-  const filtered = projectsData.filter(p => {
-    const m = p.name.toLowerCase().includes(search.toLowerCase()) || p.manager.toLowerCase().includes(search.toLowerCase());
-    return m && (filterStatus === 'all' || p.status === filterStatus);
+  async function loadData() {
+    setLoading(true);
+    try {
+      const [pData, uData] = await Promise.all([fetchMesProjets(), fetchUsers()]);
+      setProjects(pData);
+      setUsers(uData);
+    } catch (err) {
+      toast.error("Erreur lors du chargement des données");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const filtered = projects.filter(p => {
+    const m = p.nom.toLowerCase().includes(search.toLowerCase());
+    return m && (filterStatus === 'all' || p.statut === filterStatus);
   });
 
   return (
     <div style={{ padding: '20px', backgroundColor: C.bg, minHeight: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-      {/* Header */}
-      <PageHeader title="Gestion des Projets" subtitle={`${projectsData.length} projets · ${projectsData.filter(p => p.status === 'en-cours').length} en cours`}>
-        <BtnPrimary onClick={doExport} disabled={exporting}>
-          {exporting ? <RefreshCw style={{ width: '12px', height: '12px', animation: 'spin 1s linear infinite' }} /> : <Download style={{ width: '12px', height: '12px' }} />}
-          {exporting ? 'Génération…' : 'Exporter le V2 Consolidé'}
-        </BtnPrimary>
-      </PageHeader>
-
       {/* KPI */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '12px' }}>
         {[
-          { l: 'En cours', v: projectsData.filter(p => p.status === 'en-cours').length, icon: AlertCircle, c: C.blue },
-          { l: 'Planifiés', v: projectsData.filter(p => p.status === 'planifie').length, icon: Clock, c: '#F59E0B' },
-          { l: 'Terminés', v: projectsData.filter(p => p.status === 'termine').length, icon: CheckCircle, c: C.green },
+          { l: 'En cours', v: projects.filter(p => p.statut === 'EN_COURS').length, icon: AlertCircle, c: C.blue },
+          { l: 'Planifiés', v: projects.filter(p => p.statut === 'PLANIFIE').length, icon: Clock, c: '#F59E0B' },
+          { l: 'Terminés', v: projects.filter(p => p.statut === 'TERMINE').length, icon: CheckCircle, c: C.green },
         ].map(s => (
           <div key={s.l} style={{ ...cardStyle, borderLeft: `3px solid ${s.c}`, display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px' }}>
             <s.icon style={{ width: '20px', height: '20px', color: s.c }} />
@@ -152,88 +231,98 @@ export function Projects() {
           <SelectTrigger style={{ width: '160px', fontSize: '12px', borderRadius: R, height: '32px', backgroundColor: '#fff' }}><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Tous les statuts</SelectItem>
-            <SelectItem value="en-cours">En cours</SelectItem>
-            <SelectItem value="planifie">Planifié</SelectItem>
-            <SelectItem value="termine">Terminé</SelectItem>
+            <SelectItem value="EN_COURS">En cours</SelectItem>
+            <SelectItem value="PLANIFIE">Planifié</SelectItem>
+            <SelectItem value="TERMINE">Terminé</SelectItem>
           </SelectContent>
         </Select>
         <span style={{ fontSize: '11px', color: C.textMuted, marginLeft: 'auto' }}>{filtered.length} résultat{filtered.length > 1 ? 's' : ''}</span>
       </div>
 
       {/* Project Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '14px' }}>
-        {filtered.map(project => {
-          const sc = STATUS[project.status];
-          return (
-            <div key={project.id} onClick={() => setSelected(project)}
-              style={{ ...cardStyle, cursor: 'pointer', borderTop: `3px solid ${sc.accent}`, transition: 'box-shadow 0.15s, transform 0.15s' }}
-              onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = S.elevated; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = S.card; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; }}
-            >
-              <div style={{ padding: '14px 16px' }}>
-                {/* Header */}
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '10px' }}>
-                  <div style={{ flex: 1, minWidth: 0, paddingRight: '8px' }}>
-                    <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '3px', backgroundColor: sc.bg, border: `1px solid ${sc.border}`, color: sc.text, display: 'inline-flex', alignItems: 'center', gap: '4px', marginBottom: '6px' }}>
-                      <span style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: sc.dot, display: 'inline-block' }} />{sc.label}
-                    </span>
-                    <p style={{ fontSize: '14px', fontWeight: 700, color: C.text, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{project.name}</p>
+      {loading ? (
+        <div style={{ padding: '100px', textAlign: 'center' }}>
+          <Loader2 style={{ width: '40px', height: '40px', color: C.purple, animation: 'spin 1s linear infinite', margin: '0 auto' }} />
+          <p style={{ marginTop: '12px', color: C.textMuted, fontSize: '14px' }}>Chargement des projets…</p>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div style={{ padding: '80px', textAlign: 'center', backgroundColor: '#fff', borderRadius: R, border: `1px dashed ${C.border}` }}>
+          <AlertCircle style={{ width: '32px', height: '32px', color: C.textMuted, margin: '0 auto 12px' }} />
+          <p style={{ color: C.textMuted, fontSize: '14px' }}>Aucun projet trouvé</p>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '14px' }}>
+          {filtered.map(project => {
+            const start = parseISO(project.dateDebut || new Date().toISOString());
+            const end = parseISO(project.dateFin || new Date().toISOString());
+            
+            return (
+              <div key={project.id} onClick={() => setSelected(project)}
+                style={{ ...cardStyle, cursor: 'pointer', borderTop: `3px solid ${C.purple}`, transition: 'box-shadow 0.15s, transform 0.15s' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = S.elevated; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = S.card; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; }}
+              >
+                <div style={{ padding: '14px 16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '10px' }}>
+                    <div style={{ flex: 1, minWidth: 0, paddingRight: '8px' }}>
+                      <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '3px', backgroundColor: `${C.purple}10`, border: `1px solid ${C.purple}30`, color: C.purple, display: 'inline-flex', alignItems: 'center', gap: '4px', marginBottom: '6px' }}>
+                        <span style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: C.purple, display: 'inline-block' }} />
+                        {project.statut.toUpperCase()}
+                      </span>
+                      <p style={{ fontSize: '14px', fontWeight: 700, color: C.text, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{project.nom}</p>
+                    </div>
+                    <ChevronRight style={{ width: '16px', height: '16px', color: C.textMuted, flexShrink: 0, marginTop: '4px' }} />
                   </div>
-                  <ChevronRight style={{ width: '16px', height: '16px', color: C.textMuted, flexShrink: 0, marginTop: '4px' }} />
-                </div>
 
-                {/* Manager */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', paddingBottom: '10px', borderBottom: `1px solid ${C.borderLight}` }}>
-                  <Avatar name={project.manager} size={22} color={sc.accent} />
-                  <div>
-                    <p style={{ fontSize: '10px', color: C.textMuted, lineHeight: 1.2 }}>Chef de projet</p>
-                    <p style={{ fontSize: '12px', fontWeight: 600, color: C.text, lineHeight: 1.2 }}>{project.manager}</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', paddingBottom: '10px', borderBottom: `1px solid ${C.borderLight}` }}>
+                    <Avatar name={project.chefProjetNomComplet} size={22} color={C.purple} />
+                    <div>
+                      <p style={{ fontSize: '10px', color: C.textMuted, lineHeight: 1.2 }}>Chef de projet</p>
+                      <p style={{ fontSize: '12px', fontWeight: 600, color: C.text, lineHeight: 1.2 }}>{project.chefProjetNomComplet}</p>
+                    </div>
                   </div>
-                </div>
 
-                {/* Dates */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px', fontSize: '11px', color: C.textMuted }}>
-                  <Calendar style={{ width: '12px', height: '12px' }} />
-                  {format(project.start, 'dd MMM', { locale: fr })} → {format(project.end, 'dd MMM yyyy', { locale: fr })}
-                </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px', fontSize: '11px', color: C.textMuted }}>
+                    <Calendar style={{ width: '12px', height: '12px' }} />
+                    {format(start, 'dd MMM', { locale: fr })} → {format(end, 'dd MMM yyyy', { locale: fr })}
+                  </div>
 
-                {/* Progress */}
-                <div style={{ marginBottom: '10px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-                    <span style={{ fontSize: '10px', color: C.textMuted }}>Avancement</span>
-                    <span style={{ fontSize: '11px', fontWeight: 700, color: sc.accent }}>{project.completion}%</span>
-                  </div>
-                  <div style={{ height: '4px', borderRadius: '2px', backgroundColor: C.borderLight, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', borderRadius: '2px', backgroundColor: sc.accent, width: `${project.completion}%` }} />
-                  </div>
-                </div>
-
-                {/* Team */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <Users style={{ width: '12px', height: '12px', color: C.textMuted }} />
-                    <span style={{ fontSize: '11px', color: C.textMuted }}>{project.team.length} collaborateurs</span>
-                  </div>
-                  <div style={{ display: 'flex' }}>
-                    {project.team.slice(0, 4).map((m, i) => (
-                      <Avatar key={i} name={m.name} color={AVATAR_COLORS[i % AVATAR_COLORS.length]} size={22}
-                        // @ts-ignore
-                        style={{ marginLeft: i > 0 ? '-6px' : 0, border: '2px solid white', boxSizing: 'content-box' }} />
-                    ))}
-                    {project.team.length > 4 && (
-                      <div style={{ width: '22px', height: '22px', borderRadius: R, backgroundColor: C.borderLight, border: '2px solid white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: 700, color: C.textMuted, marginLeft: '-6px' }}>
-                        +{project.team.length - 4}
-                      </div>
-                    )}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '8px', borderTop: `1px dashed ${C.border}` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <Users style={{ width: '12px', height: '12px', color: C.textMuted }} />
+                      <span style={{ fontSize: '11px', color: C.textMuted }}>Équipe active</span>
+                    </div>
+                    <BtnSecondary small onClick={(e) => { e.stopPropagation(); setStaffingFor(project); }}>
+                      <UserPlus style={{ width: '10px', height: '10px' }} /> Staffer
+                    </BtnSecondary>
                   </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
-      {selected && <ProjectModal project={selected} onClose={() => setSelected(null)} />}
+      {selected && (
+        <ProjectModal 
+          project={selected} 
+          onClose={() => setSelected(null)} 
+          onStaffing={() => {
+            const p = selected;
+            setSelected(null);
+            setStaffingFor(p);
+          }} 
+        />
+      )}
+
+      {staffingFor && (
+        <StaffingModal 
+          project={staffingFor} 
+          users={users} 
+          onClose={() => setStaffingFor(null)} 
+          onRefresh={loadData} 
+        />
+      )}
     </div>
   );
 }

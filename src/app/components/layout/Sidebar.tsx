@@ -1,65 +1,15 @@
 import { NavLink, useLocation, useNavigate } from 'react-router';
+import { useState, useEffect } from 'react';
 import {
   LayoutDashboard, Users, FolderKanban, AlertTriangle,
   Lightbulb, Settings, BookOpen, Briefcase, BarChart2,
-  Calendar, Bell, UserCircle,
+  Calendar, Bell, UserCircle, Upload,
 } from 'lucide-react';
 import { C, R } from '../ui/design-system';
 import { useRole, ROLE_DASHBOARDS, type Role } from '../../context/RoleContext';
 import logo from '../../../imports/Logo_moderne_de_Staff2Staff_en_hexagone.png';
-
-/* ─── Navigation per role ─────────────────────── */
-const NAV: Record<Role, { label: string; items: { name: string; href: string; icon: any; badge?: number }[] }[]> = {
-  rm: [
-    { label: 'Principal', items: [{ name: 'Dashboard', href: '/', icon: LayoutDashboard }] },
-    {
-      label: 'Gestion', items: [
-        { name: 'Ressources', href: '/resources', icon: Users },
-        { name: 'Projets', href: '/projects', icon: FolderKanban },
-        { name: 'Conflits', href: '/conflicts', icon: AlertTriangle, badge: 5 },
-      ],
-    },
-    { label: 'Analytique', items: [{ name: 'Simulation', href: '/simulation', icon: Lightbulb }] },
-    {
-      label: 'Compte', items: [
-        { name: 'Notifications', href: '/rm/notifications', icon: Bell, badge: 3 },
-        { name: 'Mon Profil', href: '/rm/profile', icon: UserCircle },
-      ],
-    },
-    { label: 'Système', items: [{ name: 'Paramétrage', href: '/settings', icon: Settings }] },
-  ],
-  pm: [
-    { label: 'Principal', items: [{ name: 'Dashboard', href: '/pm', icon: LayoutDashboard }] },
-    {
-      label: 'Gestion', items: [
-        { name: 'Mes Projets', href: '/pm/projects', icon: Briefcase },
-        { name: 'Anomalies', href: '/pm/anomalies', icon: AlertTriangle, badge: 2 },
-      ],
-    },
-    { label: 'Rapports', items: [{ name: 'Rapports', href: '/pm/reports', icon: BarChart2 }] },
-    {
-      label: 'Compte', items: [
-        { name: 'Notifications', href: '/pm/notifications', icon: Bell, badge: 1 },
-        { name: 'Mon Profil', href: '/pm/profile', icon: UserCircle },
-      ],
-    },
-  ],
-  collab: [
-    { label: 'Principal', items: [{ name: 'Dashboard', href: '/collab', icon: LayoutDashboard }] },
-    {
-      label: 'Mon Travail', items: [
-        { name: 'Mes Projets', href: '/collab/projects', icon: FolderKanban },
-        { name: 'Mon Planning', href: '/collab/schedule', icon: Calendar },
-      ],
-    },
-    {
-      label: 'Compte', items: [
-        { name: 'Notifications', href: '/collab/notifications', icon: Bell, badge: 3 },
-        { name: 'Mon Profil', href: '/collab/profile', icon: UserCircle },
-      ],
-    },
-  ],
-};
+import { fetchAnomalies } from '../../services/anomalieService';
+import { fetchMesNotifications } from '../../services/notificationService';
 
 const ROLE_ACCENT: Record<Role, string> = { rm: '#E600A9', pm: '#2D9CDB', collab: '#059669' };
 
@@ -67,6 +17,80 @@ export function Sidebar() {
   const { role } = useRole();
   const location = useLocation();
   const accent = ROLE_ACCENT[role];
+  const [counts, setCounts] = useState({ anomalies: 0, notifications: 0 });
+
+  useEffect(() => {
+    loadCounts();
+    // Refresh counts every 30s
+    const interval = setInterval(loadCounts, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  async function loadCounts() {
+    try {
+      const [anoms, notifs] = await Promise.all([fetchAnomalies(), fetchMesNotifications()]);
+      setCounts({
+        anomalies: anoms.filter(a => !a.resolu).length,
+        notifications: notifs.filter(n => !n.lu).length
+      });
+    } catch (err) {
+      console.error("Sidebar counts error", err);
+    }
+  }
+
+  const NAV: Record<Role, { label: string; items: { name: string; href: string; icon: any; badge?: number }[] }[]> = {
+    rm: [
+      { label: 'Principal', items: [{ name: 'Dashboard', href: '/', icon: LayoutDashboard }] },
+      {
+        label: 'Gestion', items: [
+          { name: 'Ressources', href: '/resources', icon: Users },
+          { name: 'Projets', href: '/projects', icon: FolderKanban },
+          { name: 'Import Excel', href: '/import', icon: Upload },
+          { name: 'Conflits', href: '/conflicts', icon: AlertTriangle, badge: counts.anomalies },
+        ],
+      },
+      { label: 'Analytique', items: [{ name: 'Simulation', href: '/simulation', icon: Lightbulb }] },
+      {
+        label: 'Compte', items: [
+          { name: 'Notifications', href: '/rm/notifications', icon: Bell, badge: counts.notifications },
+          { name: 'Mon Profil', href: '/rm/profile', icon: UserCircle },
+        ],
+      },
+      { label: 'Système', items: [{ name: 'Paramétrage', href: '/settings', icon: Settings }] },
+    ],
+    pm: [
+      { label: 'Principal', items: [{ name: 'Dashboard', href: '/pm', icon: LayoutDashboard }] },
+      {
+        label: 'Gestion', items: [
+          { name: 'Mes Projets', href: '/pm/projects', icon: Briefcase },
+          { name: 'Import Excel', href: '/import', icon: Upload },
+          { name: 'Anomalies', href: '/pm/anomalies', icon: AlertTriangle, badge: counts.anomalies },
+        ],
+      },
+      { label: 'Rapports', items: [{ name: 'Rapports', href: '/pm/reports', icon: BarChart2 }] },
+      {
+        label: 'Compte', items: [
+          { name: 'Notifications', href: '/pm/notifications', icon: Bell, badge: counts.notifications },
+          { name: 'Mon Profil', href: '/pm/profile', icon: UserCircle },
+        ],
+      },
+    ],
+    collab: [
+      { label: 'Principal', items: [{ name: 'Dashboard', href: '/collab', icon: LayoutDashboard }] },
+      {
+        label: 'Mon Travail', items: [
+          { name: 'Mes Projets', href: '/collab/projects', icon: FolderKanban },
+          { name: 'Mon Planning', href: '/collab/schedule', icon: Calendar },
+        ],
+      },
+      {
+        label: 'Compte', items: [
+          { name: 'Notifications', href: '/collab/notifications', icon: Bell, badge: counts.notifications },
+          { name: 'Mon Profil', href: '/collab/profile', icon: UserCircle },
+        ],
+      },
+    ],
+  };
 
   const isActive = (href: string) => {
     if (href === '/') return location.pathname === '/';
@@ -123,11 +147,11 @@ export function Sidebar() {
                 >
                   <item.icon style={{ width: '14px', height: '14px', color: active ? accent : 'inherit', flexShrink: 0 }} />
                   <span style={{ fontSize: '12px', fontWeight: active ? 600 : 400, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</span>
-                  {item.badge && (
+                  {item.badge && item.badge > 0 ? (
                     <span style={{ backgroundColor: accent, color: '#fff', fontSize: '9px', fontWeight: 800, padding: '1px 5px', borderRadius: '10px', lineHeight: '15px', minWidth: '16px', textAlign: 'center' }}>
                       {item.badge}
                     </span>
-                  )}
+                  ) : null}
                 </NavLink>
               );
             })}
