@@ -1,11 +1,33 @@
-import { Outlet, Navigate, useNavigate } from 'react-router';
+import { Outlet, Navigate, useNavigate, useLocation } from 'react-router';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { Toaster } from 'sonner';
 import { useAuth } from '../../context/AuthContext';
+import { ROLE_DASHBOARDS } from '../../context/RoleContext';
+
+/**
+ * Détermine si une route est accessible pour un rôle donné.
+ * - rm  : routes commençant par /pm ou /collab → interdit
+ * - pm  : routes commençant par /collab ou pages RM uniquement → interdit
+ * - collab : seulement les routes /collab et /import (lecture)
+ */
+function isRouteAllowed(pathname: string, role: 'rm' | 'pm' | 'collab'): boolean {
+  if (role === 'rm') {
+    return !pathname.startsWith('/pm') && !pathname.startsWith('/collab');
+  }
+  if (role === 'pm') {
+    // Le PM peut accéder à /pm/* et /import (partagé)
+    if (pathname.startsWith('/pm')) return true;
+    if (pathname === '/import') return true;
+    return false;
+  }
+  // collab : uniquement /collab/*
+  return pathname.startsWith('/collab');
+}
 
 export function MainLayout() {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
+  const location = useLocation();
 
   // Show nothing while restoring session from localStorage
   if (loading) {
@@ -24,6 +46,12 @@ export function MainLayout() {
   }
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
+
+  // Si l'utilisateur est connecté mais essaie d'accéder à une route hors de son rôle,
+  // le rediriger vers son dashboard par défaut
+  if (user && !isRouteAllowed(location.pathname, user.role)) {
+    return <Navigate to={ROLE_DASHBOARDS[user.role]} replace />;
+  }
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', backgroundColor: '#F0F2F6' }}>

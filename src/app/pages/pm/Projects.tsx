@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   Plus, AlertTriangle, Calendar, ChevronRight,
   Search, CheckCircle, TrendingUp, Info, Zap, Loader2,
+  Upload, History,
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
@@ -12,6 +13,11 @@ import {
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { fetchMesProjets, creerProjet, type ProjetResponseDTO, type ProjetRequestDTO } from '../../services/projetService';
+import { ImportPrevisionModal } from '../../components/prevision/ImportPrevisionModal';
+import { PrevisionHistoryView } from '../../components/prevision/PrevisionHistoryView';
+import { PrevisionActiveCard } from '../../components/prevision/PrevisionActiveCard';
+import { PrevisionStatsCard } from '../../components/prevision/PrevisionStatsCard';
+import type { PrevisionResponseDTO } from '../../services/previsionService';
 
 /* ─── TYPES ─────────────────────────────────────── */
 interface Project {
@@ -373,16 +379,23 @@ function AddProjectModal({ onClose, onCreated }: {
 /* ════════════════════════════════════════════════ */
 /* ─── MODAL: PROJECT DETAIL ─────────────────────── */
 /* ════════════════════════════════════════════════ */
-function ProjectDetailModal({ project, onClose, onAnalyze, onPredictV2 }: {
+function ProjectDetailModal({
+  project, onClose, onAnalyze, onPredictV2, onImportPrevision, onShowHistory,
+  refreshKey,
+}: {
   project: Project;
   onClose: () => void;
   onAnalyze: () => void;
   onPredictV2: () => void;
+  onImportPrevision: () => void;
+  onShowHistory: () => void;
+  refreshKey: number;
 }) {
   const sc = STATUS_MAP[project.statut] || STATUS_MAP['PLANIFIE'];
+  const [localActivePrevision, setLocalActivePrevision] = useState<PrevisionResponseDTO | null>(null);
 
   return (
-    <Modal onClose={onClose} maxWidth="560px" accentColor={sc.accent}>
+    <Modal onClose={onClose} maxWidth="640px" accentColor={sc.accent}>
       <ModalHeader title={project.nom} subtitle={`Chef de projet : ${project.chefProjetNomComplet}`} onClose={onClose} />
       <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
         {/* Status + dates */}
@@ -423,6 +436,40 @@ function ProjectDetailModal({ project, onClose, onAnalyze, onPredictV2 }: {
           ))}
         </div>
 
+        {/* Prévisions section */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingTop: '6px', borderTop: `1px solid ${C.borderLight}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <p style={{ fontSize: '12px', fontWeight: 700, color: C.text, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Prévisions
+            </p>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <button onClick={onImportPrevision}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: R, border: `1px solid ${C.purple}30`, backgroundColor: C.purple, color: '#fff', cursor: 'pointer', fontSize: '11px', fontWeight: 700 }}
+                onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
+                onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+              >
+                <Upload style={{ width: '12px', height: '12px' }} />Importer une prévision
+              </button>
+              <button onClick={onShowHistory}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: R, border: `1px solid ${C.border}`, backgroundColor: '#fff', color: C.text, cursor: 'pointer', fontSize: '11px', fontWeight: 700 }}
+                onMouseEnter={e => (e.currentTarget.style.backgroundColor = C.bg)}
+                onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#fff')}
+              >
+                <History style={{ width: '12px', height: '12px' }} />Voir l'historique
+              </button>
+            </div>
+          </div>
+
+          <PrevisionActiveCard
+            projetId={project.id}
+            onImportClick={onImportPrevision}
+            refreshTrigger={refreshKey}
+            onActivePrevisionLoaded={setLocalActivePrevision}
+          />
+
+          <PrevisionStatsCard previsionId={localActivePrevision?.id ?? null} />
+        </div>
+
         {/* Actions */}
         <div style={{ display: 'flex', gap: '8px', paddingTop: '8px', borderTop: `1px solid ${C.borderLight}`, flexWrap: 'wrap' }}>
           <button onClick={onAnalyze}
@@ -460,6 +507,11 @@ export function PmProjects() {
   const [predictProj, setPredictProj] = useState<Project | null>(null);
   const [search, setSearch]           = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+
+  /* ─── Prevision integration state ─── */
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [historyOpen, setHistoryOpen]         = useState(false);
+  const [refreshKey, setRefreshKey]           = useState(0);
 
   /* ─── Fetch projects from API ─── */
   const loadProjects = async () => {
@@ -629,6 +681,27 @@ export function PmProjects() {
           onClose={() => setDetailProj(null)}
           onAnalyze={() => { setDetailProj(null); setAnalyzeProj(detailProj); }}
           onPredictV2={() => { setDetailProj(null); setPredictProj(detailProj); }}
+          onImportPrevision={() => setImportModalOpen(true)}
+          onShowHistory={() => setHistoryOpen(true)}
+          refreshKey={refreshKey}
+        />
+      )}
+
+      {/* ── Prevision modals ── */}
+      {detailProj && importModalOpen && (
+        <ImportPrevisionModal
+          isOpen={importModalOpen}
+          onClose={() => setImportModalOpen(false)}
+          projetId={detailProj.id}
+          onSuccess={() => setRefreshKey(k => k + 1)}
+        />
+      )}
+
+      {detailProj && historyOpen && (
+        <PrevisionHistoryView
+          isOpen={historyOpen}
+          onClose={() => setHistoryOpen(false)}
+          projetId={detailProj.id}
         />
       )}
 

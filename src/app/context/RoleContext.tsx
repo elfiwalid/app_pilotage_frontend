@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useAuth } from './AuthContext';
 
 export type Role = 'rm' | 'pm' | 'collab';
 
@@ -83,8 +84,22 @@ const RoleContext = createContext<RoleContextType>({
 export const useRole = () => useContext(RoleContext);
 
 export function RoleProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
   const [role, setRoleState] = useState<Role>('rm');
   const [profile, setProfile] = useState<UserProfile>(buildProfile('rm'));
+
+  // Synchroniser le RoleContext avec l'utilisateur authentifié
+  // (au démarrage et après refresh, le user est restauré depuis localStorage)
+  useEffect(() => {
+    if (user) {
+      setRoleState(user.role);
+      setProfile(buildProfile(user.role, user.name, user.email, user.initials));
+    } else {
+      // Pas d'utilisateur connecté : reset au profil par défaut
+      setRoleState('rm');
+      setProfile(buildProfile('rm'));
+    }
+  }, [user]);
 
   const setRole = (newRole: Role) => {
     setRoleState(newRole);
