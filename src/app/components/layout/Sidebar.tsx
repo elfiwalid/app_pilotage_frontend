@@ -24,18 +24,19 @@ export function Sidebar() {
     // Refresh counts every 30s
     const interval = setInterval(loadCounts, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [role]);
 
   async function loadCounts() {
-    try {
-      const [anoms, notifs] = await Promise.all([fetchAnomalies(), fetchMesNotifications()]);
-      setCounts({
-        anomalies: anoms.filter(a => !a.resolu).length,
-        notifications: notifs.filter(n => !n.lu).length
-      });
-    } catch (err) {
-      console.error("Sidebar counts error", err);
-    }
+    // Les anomalies ne concernent que le chef de projet ; on évite l'appel pour les autres rôles.
+    const anomaliesPromise = role === 'pm'
+      ? fetchAnomalies().then(a => a.filter(x => !x.resolu).length).catch(() => 0)
+      : Promise.resolve(0);
+    const notifsPromise = fetchMesNotifications()
+      .then(n => n.filter(x => !x.lu).length)
+      .catch(() => 0);
+
+    const [anomalies, notifications] = await Promise.all([anomaliesPromise, notifsPromise]);
+    setCounts({ anomalies, notifications });
   }
 
   const NAV: Record<Role, { label: string; items: { name: string; href: string; icon: any; badge?: number }[] }[]> = {

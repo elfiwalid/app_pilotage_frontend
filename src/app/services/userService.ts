@@ -1,4 +1,4 @@
-import { apiGet } from './api';
+import { apiGet, apiPut } from './api';
 
 export interface UserResponseDTO {
   id: number;
@@ -24,4 +24,16 @@ export function fetchUsers(): Promise<UserResponseDTO[]> {
  */
 export function fetchMyProfile(): Promise<UserResponseDTO> {
   return apiGet<UserResponseDTO>('/users/me');
+}
+
+/**
+ * Met à jour le profil de l'utilisateur actuellement connecté.
+ */
+export function updateMyProfile(data: {
+  nom: string;
+  prenom: string;
+  email: string;
+  poste: string;
+}): Promise<UserResponseDTO> {
+  return apiPut<UserResponseDTO>('/users/me', data);
 }

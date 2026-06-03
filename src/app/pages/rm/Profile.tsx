@@ -1,9 +1,10 @@
-import { useState } from 'react';
-import { Mail, Phone, MapPin, Shield, Edit3, Save, Camera, Activity, CheckCircle, Calendar, RefreshCcw, Users } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Mail, Phone, MapPin, Shield, Edit3, Save, Camera, Activity, CheckCircle, Calendar, RefreshCcw, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router';
 import { C, R, PageHeader, SectionCard, BtnPrimary, BtnGhost, cardStyle } from '../../components/ui/design-system';
 import { useRole, PROFILES, ROLE_DASHBOARDS, type Role } from '../../context/RoleContext';
+import { fetchMyProfile, updateMyProfile, type UserResponseDTO } from '../../services/userService';
 
 const activities = [
   { date: '10/04/2026', action: 'Conflit résolu — Youssef El Amrani surcharge 180%', icon: CheckCircle, color: C.green },
@@ -23,13 +24,56 @@ const ROLE_DESCS: Record<Role, string> = {
 export function RmProfile() {
   const { role, setRole } = useRole();
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<UserResponseDTO | null>(null);
   const [editing, setEditing] = useState(false);
-  const [name, setName] = useState('Fatima Zahra Bennis');
-  const [email, setEmail] = useState('fz.bennis@soprabanking.com');
-  const [phone, setPhone] = useState('+212 6 60 12 34 56');
-  const [location, setLocation] = useState('Casablanca, Maroc');
 
-  const handleSave = () => { setEditing(false); toast.success('Profil mis à jour avec succès !'); };
+  // Editable form state
+  const [nom, setNom] = useState('');
+  const [prenom, setPrenom] = useState('');
+  const [email, setEmail] = useState('');
+  const [poste, setPoste] = useState('');
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const profileData = await fetchMyProfile();
+      setProfile(profileData);
+      setNom(profileData.nom);
+      setPrenom(profileData.prenom);
+      setEmail(profileData.email);
+      setPoste(profileData.poste || '');
+    } catch (err: any) {
+      toast.error(err.message || 'Erreur de chargement du profil');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      const updated = await updateMyProfile({ nom, prenom, email, poste });
+      setProfile(updated);
+      setEditing(false);
+      toast.success('Profil mis à jour avec succès !');
+    } catch (err: any) {
+      toast.error(err.message || 'Erreur lors de la mise à jour');
+    }
+  };
+
+  const handleCancel = () => {
+    if (profile) {
+      setNom(profile.nom);
+      setPrenom(profile.prenom);
+      setEmail(profile.email);
+      setPoste(profile.poste || '');
+    }
+    setEditing(false);
+  };
 
   const handleSwitch = (r: Role) => {
     setRole(r);
@@ -44,6 +88,29 @@ export function RmProfile() {
     color: C.text, boxSizing: 'border-box',
   };
 
+  if (loading) {
+    return (
+      <div style={{ padding: '20px', backgroundColor: C.bg, minHeight: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+          <Loader2 style={{ width: '32px', height: '32px', color: C.magenta, animation: 'spin 1s linear infinite' }} />
+          <p style={{ fontSize: '13px', color: C.textMuted }}>Chargement du profil...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div style={{ padding: '20px', backgroundColor: C.bg, minHeight: '100%' }}>
+        <PageHeader title="Mon Profil" subtitle="Erreur de chargement" />
+        <p style={{ color: '#DC2626', fontSize: '13px' }}>Impossible de charger le profil.</p>
+      </div>
+    );
+  }
+
+  const fullName = `${prenom} ${nom}`;
+  const initials = `${prenom.charAt(0)}${nom.charAt(0)}`.toUpperCase();
+
   return (
     <div style={{ padding: '20px', backgroundColor: C.bg, minHeight: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <PageHeader title="Mon Profil — Resource Manager" subtitle="Informations personnelles, statistiques et changement de profil" />
@@ -55,18 +122,22 @@ export function RmProfile() {
           {/* Avatar card */}
           <div style={{ ...cardStyle, borderTop: `3px solid ${C.magenta}`, padding: '20px', textAlign: 'center' }}>
             <div style={{ position: 'relative', display: 'inline-block', marginBottom: '14px' }}>
-              <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: 'linear-gradient(135deg, #7B2CBF 0%, #E600A9 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '24px', fontWeight: 800, margin: '0 auto' }}>FZ</div>
+              <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: 'linear-gradient(135deg, #7B2CBF 0%, #E600A9 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '24px', fontWeight: 800, margin: '0 auto' }}>{initials}</div>
               <button onClick={() => toast.info('Modifier la photo de profil')} style={{ position: 'absolute', bottom: 0, right: 0, width: '22px', height: '22px', borderRadius: '50%', backgroundColor: C.magenta, border: '2px solid white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Camera style={{ width: '11px', height: '11px', color: '#fff' }} />
               </button>
             </div>
-            <p style={{ fontSize: '15px', fontWeight: 800, color: C.text, marginBottom: '3px' }}>{name}</p>
+            <p style={{ fontSize: '15px', fontWeight: 800, color: C.text, marginBottom: '3px' }}>{fullName}</p>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '3px 10px', borderRadius: R, backgroundColor: `${C.magenta}14`, border: `1px solid ${C.magenta}30`, marginBottom: '16px' }}>
               <Shield style={{ width: '11px', height: '11px', color: C.magenta }} />
               <span style={{ fontSize: '11px', fontWeight: 700, color: C.magenta }}>Resource Manager</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'left' }}>
-              {[{ icon: Mail, v: email, l: 'Email' }, { icon: Phone, v: phone, l: 'Téléphone' }, { icon: MapPin, v: location, l: 'Localisation' }].map(({ icon: Icon, v, l }) => (
+              {[
+                { icon: Mail, v: email, l: 'Email' },
+                { icon: Phone, v: profile.matricule || '—', l: 'Matricule' },
+                { icon: MapPin, v: 'Casablanca, Maroc', l: 'Localisation' }
+              ].map(({ icon: Icon, v, l }) => (
                 <div key={l} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '6px 10px', backgroundColor: C.bg, borderRadius: R, border: `1px solid ${C.borderLight}` }}>
                   <Icon style={{ width: '13px', height: '13px', color: C.magenta, flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -77,7 +148,7 @@ export function RmProfile() {
               ))}
             </div>
             <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: `1px solid ${C.borderLight}`, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              {[{ l: 'Ressources', v: '48' }, { l: 'Projets', v: '7' }, { l: 'Conflits', v: '5' }, { l: 'Simulations', v: '12' }].map(s => (
+              {[{ l: 'Taux Staffing', v: `${profile.tauxStaffing ?? 0}%` }, { l: 'Disponible', v: profile.disponible ? 'Oui' : 'Non' }, { l: 'Conflits', v: '5' }, { l: 'Simulations', v: '12' }].map(s => (
                 <div key={s.l} style={{ padding: '8px', backgroundColor: C.bg, borderRadius: R, textAlign: 'left' }}>
                   <p style={{ fontSize: '9px', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>{s.l}</p>
                   <p style={{ fontSize: '16px', fontWeight: 800, color: C.magenta }}>{s.v}</p>
@@ -101,6 +172,10 @@ export function RmProfile() {
                 </div>
               ))}
             </div>
+            <button style={{ width: '100%', padding: '8px', marginTop: '10px', borderRadius: R, border: `1px solid ${C.border}`, backgroundColor: '#fff', color: C.textSecondary, fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}
+              onMouseEnter={e => (e.currentTarget.style.backgroundColor = C.bg)} onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#fff')}>
+              Voir tout l'historique
+            </button>
           </SectionCard>
         </div>
 
@@ -115,15 +190,20 @@ export function RmProfile() {
             actions={!editing ? <BtnGhost onClick={() => setEditing(true)}><Edit3 style={{ width: '11px', height: '11px' }} />Modifier</BtnGhost> : null}
           >
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              {[{ l: 'Nom complet', v: name, sv: setName }, { l: 'Email', v: email, sv: setEmail }, { l: 'Téléphone', v: phone, sv: setPhone }, { l: 'Localisation', v: location, sv: setLocation }].map(({ l, v, sv }) => (
+              {[
+                { l: 'Nom', v: nom, sv: setNom }, 
+                { l: 'Prénom', v: prenom, sv: setPrenom }, 
+                { l: 'Email', v: email, sv: setEmail }, 
+                { l: 'Poste', v: poste, sv: setPoste }
+              ].map(({ l, v, sv }) => (
                 <div key={l}>
                   <p style={{ fontSize: '10px', fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>{l}</p>
                   {editing
                     ? <input type="text" value={v} onChange={e => sv(e.target.value)} style={inputStyle} onFocus={e => (e.target.style.borderColor = C.magenta)} onBlur={e => (e.target.style.borderColor = C.border)} />
-                    : <p style={{ fontSize: '13px', fontWeight: 600, color: C.text, padding: '7px 10px', backgroundColor: C.bg, borderRadius: R, border: `1px solid ${C.borderLight}` }}>{v}</p>}
+                    : <p style={{ fontSize: '13px', fontWeight: 600, color: C.text, padding: '7px 10px', backgroundColor: C.bg, borderRadius: R, border: `1px solid ${C.borderLight}` }}>{v || '—'}</p>}
                 </div>
               ))}
-              {[{ l: 'Rôle', v: 'Resource Manager' }, { l: 'Matricule', v: 'SBS-RM-2022-008' }].map(({ l, v }) => (
+              {[{ l: 'Rôle Système', v: profile.role }, { l: 'Matricule', v: profile.matricule || '—' }].map(({ l, v }) => (
                 <div key={l}>
                   <p style={{ fontSize: '10px', fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>{l}</p>
                   <p style={{ fontSize: '13px', fontWeight: 600, color: C.text, padding: '7px 10px', backgroundColor: C.bg, borderRadius: R, border: `1px solid ${C.borderLight}` }}>{v}</p>
@@ -133,7 +213,7 @@ export function RmProfile() {
             {editing && (
               <div style={{ display: 'flex', gap: '8px', marginTop: '14px', paddingTop: '12px', borderTop: `1px solid ${C.borderLight}` }}>
                 <BtnPrimary onClick={handleSave}><Save style={{ width: '12px', height: '12px' }} />Enregistrer</BtnPrimary>
-                <BtnGhost onClick={() => setEditing(false)}>Annuler</BtnGhost>
+                <BtnGhost onClick={handleCancel}>Annuler</BtnGhost>
               </div>
             )}
           </SectionCard>
@@ -158,7 +238,7 @@ export function RmProfile() {
                     </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1px' }}>
-                        <p style={{ fontSize: '13px', fontWeight: 700, color: C.text }}>{prof.name}</p>
+                        <p style={{ fontSize: '13px', fontWeight: 700, color: C.text }}>{prof.name || fullName}</p>
                         {isActive && <span style={{ fontSize: '9px', fontWeight: 800, color: '#fff', backgroundColor: color, padding: '1px 7px', borderRadius: '10px' }}>ACTIF</span>}
                       </div>
                       <p style={{ fontSize: '11px', color: color, fontWeight: 600, marginBottom: '1px' }}>{ROLE_LABELS[r]}</p>

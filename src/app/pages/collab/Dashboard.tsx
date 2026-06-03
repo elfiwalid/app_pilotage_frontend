@@ -1,39 +1,20 @@
-import { Briefcase, Clock, CheckSquare, Bell, ArrowUpRight, AlertCircle, TrendingUp } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Briefcase, Clock, CheckSquare, ArrowUpRight, TrendingUp, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
 import { RadialBarChart, RadialBar, PolarAngleAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
-import { C, S, R, PageHeader, SectionCard, KpiCard, cardStyle } from '../../components/ui/design-system';
+import { C, S, R, PageHeader, SectionCard, KpiCard } from '../../components/ui/design-system';
 import { useNavigate } from 'react-router';
+import { useAuth } from '../../context/AuthContext';
+import { fetchCollabDashboard, type CollabDashboardDTO } from '../../services/collaborateurService';
 
-/* ─── DATA ─────────────────────────────────────── */
-const kpiData = [
-  { title: 'Projets Assignés', value: '2', change: '+1', trendPositive: true, icon: Briefcase, accent: C.green, sub: 'projets actifs' },
-  { title: 'Charge de Travail', value: '95%', change: '+5%', trendPositive: false, icon: TrendingUp, accent: '#F59E0B', sub: 'capacité allouée' },
-  { title: 'Tâches à Venir', value: '3', change: '-1', trendPositive: true, icon: CheckSquare, accent: C.blue, sub: 'cette semaine' },
-];
-
-const workloadData = [{ name: 'Charge', value: 95, fill: '#F59E0B' }];
-
-const weeklyData = [
-  { day: 'Lun', alpha: 55, beta: 40 }, { day: 'Mar', alpha: 55, beta: 40 },
-  { day: 'Mer', alpha: 55, beta: 0 }, { day: 'Jeu', alpha: 55, beta: 40 },
-  { day: 'Ven', alpha: 55, beta: 40 },
-];
-
-const myProjects = [
-  { id: 1, name: 'Projet Alpha', role: 'Architecte Solution', alloc: 55, completion: 65, status: 'en-cours', deadline: '30 Jun 2026', color: C.purple },
-  { id: 2, name: 'Projet Beta', role: 'Tech Lead', alloc: 40, completion: 82, status: 'en-cours', deadline: '15 Mai 2026', color: C.blue },
-];
-
-const upcomingTasks = [
-  { id: 1, title: 'Revue architecture microservices — Projet Alpha', date: 'Aujourd\'hui 14h00', priority: 'high' },
-  { id: 2, title: 'Sprint planning Q2 — Projet Beta', date: 'Demain 10h00', priority: 'medium' },
-  { id: 3, title: 'Documentation API v3 — Projet Alpha', date: '14/04/2026', priority: 'low' },
-];
-
-const PRIORITY_CFG: Record<string, { bg: string; text: string; dot: string }> = {
-  high: { bg: '#FEF2F2', text: '#B91C1C', dot: C.red },
-  medium: { bg: '#FFF7ED', text: '#92400E', dot: '#F59E0B' },
-  low: { bg: '#EFF6FF', text: '#1D4ED8', dot: C.blue },
+const STATUS_LABEL: Record<string, string> = {
+  EN_COURS: 'en-cours', PLANIFIE: 'planifié', TERMINE: 'terminé', SUSPENDU: 'suspendu',
 };
+
+function chargeColor(pct: number): string {
+  if (pct > 100) return C.red;
+  if (pct >= 80) return '#F59E0B';
+  return C.green;
+}
 
 const TIP = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
@@ -45,71 +26,139 @@ const TIP = ({ active, payload, label }: any) => {
   );
 };
 
+function formatDateFr(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
+  } catch { return iso; }
+}
+
 /* ─── COMPONENT ─────────────────────────────────── */
 export function CollabDashboard() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [data, setData] = useState<CollabDashboardDTO | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const d = await fetchCollabDashboard();
+      setData(d);
+    } catch (err: any) {
+      setError(err.message || 'Impossible de charger le dashboard.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  if (loading) {
+    return (
+      <div style={{ padding: '20px', backgroundColor: C.bg, minHeight: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+          <Loader2 style={{ width: '32px', height: '32px', color: C.green, animation: 'spin 1s linear infinite' }} />
+          <p style={{ fontSize: '13px', color: C.textMuted }}>Chargement du dashboard…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div style={{ padding: '20px', backgroundColor: C.bg, minHeight: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', textAlign: 'center' }}>
+          <AlertTriangle style={{ width: '32px', height: '32px', color: C.red }} />
+          <p style={{ fontSize: '14px', fontWeight: 600, color: C.text }}>Erreur de chargement</p>
+          <p style={{ fontSize: '12px', color: C.textSecondary, maxWidth: '320px' }}>{error}</p>
+          <button onClick={load} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 16px', borderRadius: R, border: 'none', backgroundColor: C.green, color: '#fff', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}>
+            <RefreshCw style={{ width: '12px', height: '12px' }} />Réessayer
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const today = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+  const projetsActifs = data.projets.filter(p => p.statut === 'EN_COURS');
+
+  // KPIs
+  const kpiData = [
+    { title: 'Projets Assignés', value: String(data.projetsAssignes), trendPositive: true, icon: Briefcase, accent: C.green, sub: 'projets actifs' },
+    { title: 'Charge de Travail', value: `${data.tauxCharge}%`, trendPositive: data.tauxCharge <= 100, icon: TrendingUp, accent: chargeColor(data.tauxCharge), sub: 'capacité allouée' },
+    { title: 'Échéances Proches', value: String(data.projetsBientotTermines), trendPositive: true, icon: CheckSquare, accent: C.blue, sub: 'sous 30 jours' },
+    { title: 'Avancement Moyen', value: `${data.avancementMoyen}%`, trendPositive: true, icon: ArrowUpRight, accent: C.purple, sub: 'projets actifs' },
+  ];
+
+  // Charge mensuelle → bar chart (6 prochains mois)
+  const monthly = data.chargeMensuelle.slice(0, 6).map(m => ({
+    mois: m.mois,
+    charge: m.tauxCharge,
+    projets: m.nombreProjets,
+  }));
+
+  const workloadData = [{ name: 'Charge', value: Math.min(data.tauxCharge, 100), fill: chargeColor(data.tauxCharge) }];
 
   return (
     <div style={{ padding: '20px', backgroundColor: C.bg, minHeight: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
       {/* Header */}
-      <PageHeader title="Mon Dashboard" subtitle="Vue personnelle de vos projets et tâches · Youssef El Amrani · 10 Avril 2026" />
+      <PageHeader title="Mon Dashboard" subtitle={`Vue personnelle de vos projets et tâches · ${user?.name ?? ''} · ${today}`} />
 
       {/* KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '12px' }}>
-        {kpiData.map(k => <KpiCard key={k.title} label={k.title} value={k.value} sub={k.sub} trend={k.change} trendPositive={k.trendPositive} icon={k.icon} accent={k.accent} />)}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '12px' }}>
+        {kpiData.map(k => <KpiCard key={k.title} label={k.title} value={k.value} sub={k.sub} trendPositive={k.trendPositive} icon={k.icon} accent={k.accent} />)}
       </div>
 
       {/* Main content */}
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
 
-        {/* Weekly workload chart */}
-        <SectionCard title="Charge Hebdomadaire" subtitle="Répartition par projet cette semaine" accent={C.green}>
+        {/* Monthly workload chart */}
+        <SectionCard title="Charge Mensuelle Prévue" subtitle="Taux d'affectation cumulé par mois (6 mois)" accent={C.green}>
           <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={weeklyData} barSize={18} barCategoryGap="30%" margin={{ top: 4, right: 16, bottom: 0, left: -16 }}>
+            <BarChart data={monthly} barSize={28} barCategoryGap="30%" margin={{ top: 4, right: 16, bottom: 0, left: -16 }}>
               <CartesianGrid strokeDasharray="4 4" stroke={C.borderLight} vertical={false} />
-              <XAxis dataKey="day" tick={{ fontSize: 11, fill: C.textMuted }} tickLine={false} axisLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: C.textMuted }} tickLine={false} axisLine={false} unit="%" domain={[0, 120]} />
+              <XAxis dataKey="mois" tick={{ fontSize: 11, fill: C.textMuted }} tickLine={false} axisLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: C.textMuted }} tickLine={false} axisLine={false} unit="%" domain={[0, 'dataMax + 20']} />
               <Tooltip content={<TIP />} />
-              <Bar dataKey="alpha" name="Projet Alpha" fill={C.purple} radius={[2, 2, 0, 0]} />
-              <Bar dataKey="beta" name="Projet Beta" fill={C.blue} radius={[2, 2, 0, 0]} />
+              <Bar dataKey="charge" name="Charge" fill={C.green} radius={[3, 3, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
           <div style={{ display: 'flex', gap: '16px', marginTop: '8px', paddingTop: '8px', borderTop: `1px solid ${C.borderLight}` }}>
-            {[{ c: C.purple, l: 'Projet Alpha (55%)' }, { c: C.blue, l: 'Projet Beta (40%)' }].map(i => (
-              <div key={i.l} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: C.textMuted }}>
-                <div style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: i.c }} />{i.l}
-              </div>
-            ))}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: C.textMuted }}>
+              <div style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: C.green }} />Charge cumulée mensuelle
+            </div>
           </div>
         </SectionCard>
 
         {/* Workload gauge */}
-        <SectionCard title="Mon Taux de Charge" subtitle="Allocation globale actuelle" accent='#F59E0B'>
+        <SectionCard title="Mon Taux de Charge" subtitle="Allocation globale actuelle" accent={chargeColor(data.tauxCharge)}>
           <div style={{ position: 'relative', textAlign: 'center' }}>
             <ResponsiveContainer width="100%" height={160}>
               <RadialBarChart cx="50%" cy="50%" innerRadius="60%" outerRadius="90%" barSize={12} data={workloadData} startAngle={180} endAngle={0}>
                 <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
-                <RadialBar dataKey="value" fill="#F59E0B" cornerRadius={6} background={{ fill: C.borderLight }} />
+                <RadialBar dataKey="value" fill={chargeColor(data.tauxCharge)} cornerRadius={6} background={{ fill: C.borderLight }} />
               </RadialBarChart>
             </ResponsiveContainer>
             <div style={{ position: 'absolute', top: '55%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
-              <p style={{ fontSize: '1.75rem', fontWeight: 800, color: '#D97706', lineHeight: 1 }}>95%</p>
+              <p style={{ fontSize: '1.75rem', fontWeight: 800, color: chargeColor(data.tauxCharge), lineHeight: 1 }}>{data.tauxCharge}%</p>
               <p style={{ fontSize: '10px', color: C.textMuted }}>Chargé</p>
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: '10px' }}>
-            {myProjects.map(p => (
+            {projetsActifs.map(p => (
               <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ width: '6px', height: '6px', borderRadius: '2px', backgroundColor: p.color, flexShrink: 0 }} />
-                <span style={{ fontSize: '11px', color: C.textSecondary, flex: 1 }}>{p.name}</span>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: p.color }}>{p.alloc}%</span>
+                <div style={{ width: '6px', height: '6px', borderRadius: '2px', backgroundColor: p.couleur, flexShrink: 0 }} />
+                <span style={{ fontSize: '11px', color: C.textSecondary, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.nom}</span>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: p.couleur }}>{p.tauxAffectation}%</span>
               </div>
             ))}
             <div style={{ height: '1px', backgroundColor: C.borderLight, margin: '4px 0' }} />
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
               <span style={{ color: C.textMuted }}>Capacité restante</span>
-              <span style={{ fontWeight: 700, color: C.green }}>5%</span>
+              <span style={{ fontWeight: 700, color: data.capaciteRestante > 0 ? C.green : C.red }}>{data.capaciteRestante}%</span>
             </div>
           </div>
         </SectionCard>
@@ -119,49 +168,65 @@ export function CollabDashboard() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
 
         {/* My Projects */}
-        <SectionCard title="Mes Projets" subtitle="2 projets actifs" accent={C.green}
+        <SectionCard title="Mes Projets" subtitle={`${projetsActifs.length} projet(s) actif(s)`} accent={C.green}
           actions={<button onClick={() => navigate('/collab/projects')} style={{ fontSize: '11px', fontWeight: 600, color: C.green, display: 'flex', alignItems: 'center', gap: '3px', background: 'none', border: 'none', cursor: 'pointer' }}>Voir tout <ArrowUpRight style={{ width: '11px', height: '11px' }} /></button>}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {myProjects.map(p => (
+            {data.projets.length === 0 ? (
+              <p style={{ fontSize: '12px', color: C.textMuted, textAlign: 'center', padding: '20px 0' }}>Aucun projet assigné.</p>
+            ) : data.projets.slice(0, 4).map(p => (
               <div key={p.id} onClick={() => navigate('/collab/projects')}
-                style={{ padding: '12px', borderRadius: R, border: `1px solid ${C.border}`, borderLeft: `3px solid ${p.color}`, cursor: 'pointer', transition: 'background 0.1s' }}
+                style={{ padding: '12px', borderRadius: R, border: `1px solid ${C.border}`, borderLeft: `3px solid ${p.couleur}`, cursor: 'pointer', transition: 'background 0.1s' }}
                 onMouseEnter={e => (e.currentTarget.style.backgroundColor = C.bg)}
                 onMouseLeave={e => (e.currentTarget.style.backgroundColor = C.white)}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                  <div>
-                    <p style={{ fontSize: '13px', fontWeight: 700, color: C.text }}>{p.name}</p>
-                    <p style={{ fontSize: '10px', color: C.textMuted }}>{p.role} · {p.alloc}% alloué</p>
+                  <div style={{ minWidth: 0 }}>
+                    <p style={{ fontSize: '13px', fontWeight: 700, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.nom}</p>
+                    <p style={{ fontSize: '10px', color: C.textMuted }}>{p.role} · {p.tauxAffectation}% alloué</p>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <p style={{ fontSize: '14px', fontWeight: 800, color: p.color }}>{p.completion}%</p>
+                  <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: '8px' }}>
+                    <p style={{ fontSize: '14px', fontWeight: 800, color: p.couleur }}>{p.avancement}%</p>
                     <p style={{ fontSize: '9px', color: C.textMuted }}>avancement</p>
                   </div>
                 </div>
                 <div style={{ height: '4px', borderRadius: '2px', backgroundColor: C.borderLight, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', borderRadius: '2px', backgroundColor: p.color, width: `${p.completion}%` }} />
+                  <div style={{ height: '100%', borderRadius: '2px', backgroundColor: p.couleur, width: `${p.avancement}%` }} />
                 </div>
-                <p style={{ fontSize: '10px', color: C.textMuted, marginTop: '5px' }}>Deadline : {p.deadline}</p>
+                <p style={{ fontSize: '10px', color: C.textMuted, marginTop: '5px' }}>Deadline : {formatDateFr(p.dateFin)}</p>
               </div>
             ))}
           </div>
         </SectionCard>
 
-        {/* Upcoming Tasks */}
-        <SectionCard title="Tâches à Venir" subtitle="3 tâches cette semaine" accent={C.blue}
+        {/* Upcoming deadlines (échéances proches) */}
+        <SectionCard title="Échéances à Venir" subtitle="Projets se terminant prochainement" accent={C.blue}
           actions={<button onClick={() => navigate('/collab/schedule')} style={{ fontSize: '11px', fontWeight: 600, color: C.blue, display: 'flex', alignItems: 'center', gap: '3px', background: 'none', border: 'none', cursor: 'pointer' }}>Voir le planning <ArrowUpRight style={{ width: '11px', height: '11px' }} /></button>}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {upcomingTasks.map(t => {
-              const pc = PRIORITY_CFG[t.priority];
-              return (
-                <div key={t.id} style={{ padding: '10px 12px', borderRadius: R, backgroundColor: pc.bg, borderLeft: `3px solid ${pc.dot}` }}>
-                  <p style={{ fontSize: '12px', fontWeight: 600, color: C.text, marginBottom: '3px', lineHeight: 1.4 }}>{t.title}</p>
-                  <p style={{ fontSize: '10px', color: pc.text, fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <Clock style={{ width: '10px', height: '10px' }} />{t.date}
-                  </p>
-                </div>
-              );
-            })}
+            {(() => {
+              const now = new Date();
+              const upcoming = projetsActifs
+                .filter(p => new Date(p.dateFin) >= now)
+                .sort((a, b) => new Date(a.dateFin).getTime() - new Date(b.dateFin).getTime())
+                .slice(0, 4);
+              if (upcoming.length === 0) {
+                return <p style={{ fontSize: '12px', color: C.textMuted, textAlign: 'center', padding: '20px 0' }}>Aucune échéance proche.</p>;
+              }
+              return upcoming.map(p => {
+                const days = Math.ceil((new Date(p.dateFin).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                const urgent = days <= 30;
+                const bg = urgent ? '#FEF2F2' : '#EFF6FF';
+                const dot = urgent ? C.red : C.blue;
+                const txt = urgent ? '#B91C1C' : '#1D4ED8';
+                return (
+                  <div key={p.id} style={{ padding: '10px 12px', borderRadius: R, backgroundColor: bg, borderLeft: `3px solid ${dot}` }}>
+                    <p style={{ fontSize: '12px', fontWeight: 600, color: C.text, marginBottom: '3px', lineHeight: 1.4 }}>{p.nom} — {p.role}</p>
+                    <p style={{ fontSize: '10px', color: txt, fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Clock style={{ width: '10px', height: '10px' }} />{formatDateFr(p.dateFin)} · dans {days} jour{days > 1 ? 's' : ''}
+                    </p>
+                  </div>
+                );
+              });
+            })()}
           </div>
         </SectionCard>
       </div>

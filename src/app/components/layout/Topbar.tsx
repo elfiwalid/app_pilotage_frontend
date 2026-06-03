@@ -1,28 +1,36 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, Bell, ChevronDown, Settings, LogOut, User, Shield } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { C, S, R } from '../ui/design-system';
 import { useRole } from '../../context/RoleContext';
 import { useAuth } from '../../context/AuthContext';
+import {
+  fetchMesNotifications, marquerToutesCommeLues, marquerCommeLue,
+  type NotificationResponseDTO,
+} from '../../services/notificationService';
 
-const NOTIFS_BY_ROLE = {
-  rm: [
-    { id: 1, text: 'Conflit critique — Youssef El Amrani (180%)', time: 'Il y a 5 min', read: false },
-    { id: 2, text: 'Affectation validée — Projet Alpha', time: 'Il y a 22 min', read: false },
-    { id: 3, text: 'Sara Benali : surcharge 200% sur Projet Delta', time: 'Il y a 1h', read: true },
-  ],
-  pm: [
-    { id: 1, text: 'Anomalie détectée — Projet Alpha (surcharge 180%)', time: 'Il y a 10 min', read: false },
-    { id: 2, text: 'Budget Projet Beta : alerte dépassement 15%', time: 'Il y a 45 min', read: false },
-    { id: 3, text: 'Rapport mensuel généré avec succès', time: 'Il y a 2h', read: true },
-  ],
-  collab: [
-    { id: 1, text: 'Nouvelle affectation : Projet Gamma (40%)', time: 'Il y a 1h', read: false },
-    { id: 2, text: 'Réunion projet Alpha — demain 10h00', time: 'Il y a 2h', read: false },
-    { id: 3, text: 'Votre planning a été mis à jour', time: 'Il y a 3h', read: true },
-  ],
+const NOTIF_ROUTE: Record<string, string> = {
+  rm: '/rm/notifications',
+  pm: '/pm/notifications',
+  collab: '/collab/notifications',
 };
+
+function timeAgo(iso: string): string {
+  try {
+    const d = new Date(iso);
+    const diff = Date.now() - d.getTime();
+    const min = Math.floor(diff / 60000);
+    if (min < 1) return "À l'instant";
+    if (min < 60) return `Il y a ${min} min`;
+    const h = Math.floor(min / 60);
+    if (h < 24) return `Il y a ${h}h`;
+    const days = Math.floor(h / 24);
+    if (days === 1) return 'Hier';
+    if (days < 7) return `Il y a ${days} jours`;
+    return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
+  } catch { return iso; }
+}
 
 export function Topbar() {
   const { role, profile } = useRole();
@@ -30,10 +38,43 @@ export function Topbar() {
   const navigate = useNavigate();
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [notifs, setNotifs] = useState<NotificationResponseDTO[]>([]);
 
-  const notifs = NOTIFS_BY_ROLE[role];
-  const unreadCount = notifs.filter(n => !n.read).length;
+  const loadNotifs = async () => {
+    try {
+      setNotifs(await fetchMesNotifications());
+    } catch {
+      setNotifs([]);
+    }
+  };
+
+  // Charger au montage + rafraîchir toutes les 30s
+  useEffect(() => {
+    loadNotifs();
+    const interval = setInterval(loadNotifs, 30000);
+    return () => clearInterval(interval);
+  }, [role]);
+
+  const unreadCount = notifs.filter(n => !n.lu).length;
   const accent = profile.accent;
+
+  const handleMarkAll = async () => {
+    try {
+      await marquerToutesCommeLues();
+      setNotifs(p => p.map(n => ({ ...n, lu: true })));
+    } catch (e: any) {
+      toast.error(e.message || 'Erreur.');
+    }
+  };
+
+  const handleClickNotif = async (n: NotificationResponseDTO) => {
+    setNotifOpen(false);
+    if (!n.lu) {
+      try { await marquerCommeLue(n.id); setNotifs(p => p.map(x => x.id === n.id ? { ...x, lu: true } : x)); }
+      catch { /* ignore */ }
+    }
+    navigate(NOTIF_ROUTE[role] ?? '/');
+  };
 
   return (
     <header style={{ height: '52px', backgroundColor: C.white, borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', flexShrink: 0, zIndex: 20, position: 'relative' }}>

@@ -1,43 +1,103 @@
-import { useState } from 'react';
-import { Bell, CheckCircle, AlertCircle, Calendar, Briefcase, Clock, Check, Trash2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Bell, CheckCircle, AlertCircle, Briefcase, FolderKanban, Clock, Check, Trash2, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { C, R, PageHeader, cardStyle } from '../../components/ui/design-system';
+import {
+  fetchMesNotifications, marquerCommeLue, marquerToutesCommeLues, supprimerNotification,
+  type NotificationResponseDTO,
+} from '../../services/notificationService';
 
-const ALL_NOTIFS = [
-  { id: 1, type: 'assignment', title: 'Nouvelle affectation', body: 'Vous avez été affecté au Projet Gamma à hauteur de 40%. Prise d\'effet le 15 Avril 2026.', time: 'Il y a 1h', read: false, icon: Briefcase, color: C.green, priority: 'medium' },
-  { id: 2, type: 'meeting', title: 'Réunion Projet Alpha demain', body: 'Sprint review avec le client BCP Bank — Demain 10h00, Salle Agadir.', time: 'Il y a 2h', read: false, icon: Calendar, color: C.purple, priority: 'high' },
-  { id: 3, type: 'update', title: 'Planning mis à jour', body: 'Votre planning a été modifié par le Resource Manager. Projet Beta : +5% allocation du 18 au 25 Avril.', time: 'Il y a 3h', read: true, icon: Bell, color: C.blue, priority: 'low' },
-  { id: 4, type: 'conflict', title: 'Alerte surcharge détectée', body: 'Votre taux de charge atteint 95%. Le Resource Manager a été notifié. Une révision de votre planning peut être effectuée.', time: 'Hier 15h30', read: true, icon: AlertCircle, color: '#F59E0B', priority: 'high' },
-  { id: 5, type: 'meeting', title: 'Sprint planning Q2 — Projet Beta', body: 'Invitation reçue pour le sprint planning du 2ème trimestre. Mercredi 15 Avril à 14h00.', time: 'Hier 11h00', read: true, icon: Calendar, color: C.blue, priority: 'medium' },
-  { id: 6, type: 'assignment', title: 'Tâche assignée — Documentation API', body: 'Une nouvelle tâche vous a été assignée : Documentation API v3 pour le Projet Alpha. Deadline : 14/04/2026.', time: '08/04/2026', read: true, icon: Briefcase, color: C.purple, priority: 'low' },
-];
-
-const TYPE_CFG: Record<string, { label: string; bg: string; text: string }> = {
-  assignment: { label: 'Affectation', bg: '#ECFDF5', text: '#065F46' },
-  meeting: { label: 'Réunion', bg: '#EFF6FF', text: '#1D4ED8' },
-  update: { label: 'Mise à jour', bg: `${C.purple}10`, text: C.purple },
-  conflict: { label: 'Alerte', bg: '#FFF7ED', text: '#92400E' },
+const TYPE_CFG: Record<string, { label: string; bg: string; text: string; color: string; icon: any }> = {
+  ANOMALIE: { label: 'Alerte', bg: '#FFF7ED', text: '#92400E', color: '#F59E0B', icon: AlertCircle },
+  AFFECTATION: { label: 'Affectation', bg: '#ECFDF5', text: '#065F46', color: C.green, icon: Briefcase },
+  PROJET: { label: 'Projet', bg: '#EFF6FF', text: '#1D4ED8', color: C.blue, icon: FolderKanban },
+  SYSTEME: { label: 'Système', bg: `${C.purple}10`, text: C.purple, color: C.purple, icon: Bell },
 };
 
-const PRIORITY_BAR: Record<string, string> = { high: C.red, medium: '#F59E0B', low: C.green };
+function timeAgo(iso: string): string {
+  try {
+    const d = new Date(iso);
+    const diff = Date.now() - d.getTime();
+    const min = Math.floor(diff / 60000);
+    if (min < 1) return "À l'instant";
+    if (min < 60) return `Il y a ${min} min`;
+    const h = Math.floor(min / 60);
+    if (h < 24) return `Il y a ${h}h`;
+    const days = Math.floor(h / 24);
+    if (days === 1) return 'Hier';
+    if (days < 7) return `Il y a ${days} jours`;
+    return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
+  } catch { return iso; }
+}
 
 export function CollabNotifications() {
-  const [notifs, setNotifs] = useState(ALL_NOTIFS);
+  const [notifs, setNotifs] = useState<NotificationResponseDTO[]>([]);
   const [filter, setFilter] = useState('all');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      setNotifs(await fetchMesNotifications());
+    } catch (err: any) {
+      setError(err.message || 'Impossible de charger les notifications.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
 
   const filtered = notifs.filter(n => {
-    if (filter === 'unread') return !n.read;
-    if (filter === 'assignment') return n.type === 'assignment';
-    if (filter === 'meeting') return n.type === 'meeting';
-    if (filter === 'alert') return n.type === 'conflict';
+    if (filter === 'unread') return !n.lu;
+    if (filter === 'AFFECTATION') return n.type === 'AFFECTATION';
+    if (filter === 'PROJET') return n.type === 'PROJET';
+    if (filter === 'ANOMALIE') return n.type === 'ANOMALIE';
     return true;
   });
 
-  const markRead = (id: number) => setNotifs(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
-  const markAll = () => { setNotifs(prev => prev.map(n => ({ ...n, read: true }))); toast.success('Toutes les notifications marquées comme lues.'); };
-  const deleteNotif = (id: number) => { setNotifs(prev => prev.filter(n => n.id !== id)); toast.success('Notification supprimée.'); };
+  const unreadCount = notifs.filter(n => !n.lu).length;
 
-  const unreadCount = notifs.filter(n => !n.read).length;
+  const markRead = async (id: number) => {
+    try { await marquerCommeLue(id); setNotifs(p => p.map(n => n.id === id ? { ...n, lu: true } : n)); }
+    catch (e: any) { toast.error(e.message || 'Erreur.'); }
+  };
+  const markAll = async () => {
+    try { await marquerToutesCommeLues(); setNotifs(p => p.map(n => ({ ...n, lu: true }))); toast.success('Toutes les notifications marquées comme lues.'); }
+    catch (e: any) { toast.error(e.message || 'Erreur.'); }
+  };
+  const del = async (id: number) => {
+    try { await supprimerNotification(id); setNotifs(p => p.filter(n => n.id !== id)); toast.success('Notification supprimée.'); }
+    catch (e: any) { toast.error(e.message || 'Erreur.'); }
+  };
+
+  if (loading) {
+    return (
+      <div style={{ padding: '20px', backgroundColor: C.bg, minHeight: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+          <Loader2 style={{ width: '32px', height: '32px', color: C.green, animation: 'spin 1s linear infinite' }} />
+          <p style={{ fontSize: '13px', color: C.textMuted }}>Chargement des notifications…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ padding: '20px', backgroundColor: C.bg, minHeight: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', textAlign: 'center' }}>
+          <AlertTriangle style={{ width: '32px', height: '32px', color: C.red }} />
+          <p style={{ fontSize: '14px', fontWeight: 600, color: C.text }}>Erreur de chargement</p>
+          <p style={{ fontSize: '12px', color: C.textSecondary, maxWidth: '320px' }}>{error}</p>
+          <button onClick={load} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 16px', borderRadius: R, border: 'none', backgroundColor: C.green, color: '#fff', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}>
+            <RefreshCw style={{ width: '12px', height: '12px' }} />Réessayer
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: '20px', backgroundColor: C.bg, minHeight: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -57,8 +117,8 @@ export function CollabNotifications() {
         {[
           { l: 'Total', v: notifs.length, c: '#6B7280' },
           { l: 'Non lues', v: unreadCount, c: C.magenta },
-          { l: 'Alertes', v: notifs.filter(n => n.type === 'conflict').length, c: '#F59E0B' },
-          { l: 'Réunions', v: notifs.filter(n => n.type === 'meeting').length, c: C.blue },
+          { l: 'Affectations', v: notifs.filter(n => n.type === 'AFFECTATION').length, c: C.green },
+          { l: 'Projets', v: notifs.filter(n => n.type === 'PROJET').length, c: C.blue },
         ].map(s => (
           <div key={s.l} style={{ ...cardStyle, borderLeft: `3px solid ${s.c}`, padding: '10px 14px' }}>
             <p style={{ fontSize: '10px', fontWeight: 600, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '3px' }}>{s.l}</p>
@@ -68,8 +128,8 @@ export function CollabNotifications() {
       </div>
 
       {/* Filters */}
-      <div style={{ display: 'flex', gap: '6px' }}>
-        {[['all', 'Toutes'], ['unread', 'Non lues'], ['assignment', 'Affectations'], ['meeting', 'Réunions'], ['alert', 'Alertes']].map(([v, l]) => (
+      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+        {[['all', 'Toutes'], ['unread', 'Non lues'], ['AFFECTATION', 'Affectations'], ['PROJET', 'Projets'], ['ANOMALIE', 'Alertes']].map(([v, l]) => (
           <button key={v} onClick={() => setFilter(v)}
             style={{ padding: '5px 12px', borderRadius: R, border: `1px solid ${filter === v ? C.green : C.border}`, backgroundColor: filter === v ? `${C.green}10` : '#fff', color: filter === v ? C.green : C.textMuted, cursor: 'pointer', fontSize: '11px', fontWeight: 600, transition: 'all 0.12s' }}
           >{l}{v === 'unread' && unreadCount > 0 && <span style={{ marginLeft: '5px', backgroundColor: C.magenta, color: '#fff', fontSize: '9px', fontWeight: 800, padding: '1px 5px', borderRadius: '10px' }}>{unreadCount}</span>}</button>
@@ -86,41 +146,31 @@ export function CollabNotifications() {
           </div>
         )}
         {filtered.map(n => {
-          const tc = TYPE_CFG[n.type];
-          const priorityColor = PRIORITY_BAR[n.priority];
+          const tc = TYPE_CFG[n.type] || TYPE_CFG.SYSTEME;
+          const Icon = tc.icon;
           return (
             <div key={n.id}
-              style={{ ...cardStyle, borderLeft: `4px solid ${n.read ? C.borderLight : n.color}`, backgroundColor: n.read ? C.white : `${n.color}04`, transition: 'all 0.12s' }}
+              style={{ ...cardStyle, borderLeft: `4px solid ${n.lu ? C.borderLight : tc.color}`, backgroundColor: n.lu ? C.white : `${tc.color}04`, transition: 'all 0.12s' }}
               onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)')}
               onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)')}
             >
               <div style={{ padding: '12px 14px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                {/* Icon */}
-                <div style={{ width: '36px', height: '36px', borderRadius: R, backgroundColor: `${n.color}14`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <n.icon style={{ width: '16px', height: '16px', color: n.color }} />
+                <div style={{ width: '36px', height: '36px', borderRadius: R, backgroundColor: `${tc.color}14`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Icon style={{ width: '16px', height: '16px', color: tc.color }} />
                 </div>
-
-                {/* Content */}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px', flexWrap: 'wrap' }}>
-                    <p style={{ fontSize: '13px', fontWeight: n.read ? 600 : 700, color: C.text }}>{n.title}</p>
-                    {!n.read && <div style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: n.color, flexShrink: 0 }} />}
+                    <p style={{ fontSize: '13px', fontWeight: n.lu ? 600 : 700, color: C.text }}>{n.titre}</p>
+                    {!n.lu && <div style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: tc.color, flexShrink: 0 }} />}
                     <span style={{ fontSize: '9px', fontWeight: 700, padding: '1px 6px', borderRadius: '3px', backgroundColor: tc.bg, color: tc.text }}>{tc.label}</span>
-                    <span style={{ fontSize: '9px', fontWeight: 700, padding: '1px 6px', borderRadius: '3px', backgroundColor: `${priorityColor}15`, color: priorityColor }}>
-                      {n.priority === 'high' ? 'Priorité haute' : n.priority === 'medium' ? 'Priorité moyenne' : 'Priorité basse'}
-                    </span>
                   </div>
-                  <p style={{ fontSize: '12px', color: C.textSecondary, lineHeight: 1.5, marginBottom: '6px' }}>{n.body}</p>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ fontSize: '10px', color: C.textMuted, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <Clock style={{ width: '10px', height: '10px' }} />{n.time}
-                    </span>
-                  </div>
+                  <p style={{ fontSize: '12px', color: C.textSecondary, lineHeight: 1.5, marginBottom: '6px' }}>{n.message}</p>
+                  <span style={{ fontSize: '10px', color: C.textMuted, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Clock style={{ width: '10px', height: '10px' }} />{timeAgo(n.dateCreation)}
+                  </span>
                 </div>
-
-                {/* Actions */}
                 <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
-                  {!n.read && (
+                  {!n.lu && (
                     <button onClick={() => markRead(n.id)}
                       style={{ width: '28px', height: '28px', borderRadius: R, border: `1px solid ${C.border}`, backgroundColor: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                       title="Marquer comme lu"
@@ -129,7 +179,7 @@ export function CollabNotifications() {
                       <Check style={{ width: '12px', height: '12px', color: C.green }} />
                     </button>
                   )}
-                  <button onClick={() => deleteNotif(n.id)}
+                  <button onClick={() => del(n.id)}
                     style={{ width: '28px', height: '28px', borderRadius: R, border: `1px solid ${C.border}`, backgroundColor: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                     title="Supprimer"
                     onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#FEF2F2')} onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#fff')}
