@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Calendar, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
 import { C, R, PageHeader, SectionCard, cardStyle } from '../../components/ui/design-system';
 import { useAuth } from '../../context/AuthContext';
-import { fetchCollabPlanning, type CollabPlanningJourDTO, type SlotDTO } from '../../services/collaborateurService';
+import { fetchCollabPlanning, type CollabPlanningJourDTO, type SlotDTO, type TacheJourDTO } from '../../services/collaborateurService';
 
 const DAY_NAMES = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 const MONTH_NAMES = [
@@ -66,9 +66,11 @@ export function CollabSchedule() {
 
   // Map jour → slots
   const slotsByDay: Record<number, SlotDTO[]> = {};
+  const tachesByDay: Record<number, TacheJourDTO[]> = {};
   planning.forEach(p => {
     const day = new Date(p.date + 'T00:00:00').getDate();
-    slotsByDay[day] = p.slots;
+    slotsByDay[day] = p.slots || [];
+    tachesByDay[day] = p.taches || [];
   });
 
   const getTotal = (d: number) => (slotsByDay[d] || []).reduce((s, sl) => s + sl.alloc, 0);
@@ -90,6 +92,7 @@ export function CollabSchedule() {
 
   // Résumé mensuel : moyenne de charge sur les jours ouvrés saisis
   const joursSaisis = Object.keys(slotsByDay).filter(d => (slotsByDay[Number(d)] || []).length > 0).length;
+  const totalTaches = Object.values(tachesByDay).reduce((sum, taches) => sum + taches.length, 0);
   const chargeMoyenne = (() => {
     const totals = Object.keys(slotsByDay)
       .map(d => getTotal(Number(d)))
@@ -150,6 +153,7 @@ export function CollabSchedule() {
                   if (!day) return <div key={i} />;
                   const weekend = isWeekendDay(year, month, day);
                   const slots = slotsByDay[day] || [];
+                  const taches = tachesByDay[day] || [];
                   const total = getTotal(day);
                   const isSelected = selectedDay === day;
                   const today = isToday(day);
@@ -180,6 +184,13 @@ export function CollabSchedule() {
                         </div>
                       ))}
                       {slots.length > 2 && <span style={{ fontSize: '8px', color: C.textMuted }}>+{slots.length - 2}</span>}
+
+                      {taches.slice(0, 2).map((t, ti) => (
+                        <div key={`t-${ti}`} style={{ fontSize: '7px', fontWeight: 700, color: C.textSecondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>
+                          {t.tache}
+                        </div>
+                      ))}
+                      {taches.length > 2 && <span style={{ fontSize: '8px', color: C.textMuted }}>+{taches.length - 2} taches</span>}
 
                       {/* Total bar */}
                       {total > 0 && (
@@ -217,7 +228,7 @@ export function CollabSchedule() {
               {selectedDay ? (
                 isWeekendDay(year, month, selectedDay) ? (
                   <p style={{ fontSize: '12px', color: C.textMuted, textAlign: 'center', padding: '12px 0' }}>Weekend / Jour non ouvrable</p>
-                ) : (slotsByDay[selectedDay] || []).length > 0 ? (
+                ) : (slotsByDay[selectedDay] || []).length > 0 || (tachesByDay[selectedDay] || []).length > 0 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {(slotsByDay[selectedDay] || []).map((sl, i) => (
                       <div key={i} style={{ padding: '8px 10px', borderRadius: R, borderLeft: `3px solid ${sl.couleur}`, border: `1px solid ${sl.couleur}20`, borderLeftWidth: '3px', backgroundColor: `${sl.couleur}06` }}>
@@ -228,6 +239,12 @@ export function CollabSchedule() {
                         <div style={{ height: '3px', borderRadius: '2px', backgroundColor: C.borderLight, overflow: 'hidden' }}>
                           <div style={{ height: '100%', borderRadius: '2px', backgroundColor: sl.couleur, width: `${Math.min(sl.alloc, 100)}%` }} />
                         </div>
+                      </div>
+                    ))}
+                    {(tachesByDay[selectedDay] || []).map((t, i) => (
+                      <div key={`task-${i}`} style={{ padding: '7px 10px', borderRadius: R, border: `1px solid ${C.border}`, backgroundColor: C.bg }}>
+                        <p style={{ fontSize: '11px', fontWeight: 700, color: C.text }}>{t.tache}</p>
+                        <p style={{ fontSize: '10px', color: C.textMuted }}>{t.projet}</p>
                       </div>
                     ))}
                     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', borderRadius: R, backgroundColor: C.bg, border: `1px solid ${C.border}` }}>
@@ -253,6 +270,7 @@ export function CollabSchedule() {
               { l: 'Jours avec affectation', v: String(joursSaisis) },
               { l: 'Charge moyenne / jour', v: `${chargeMoyenne}%` },
               { l: 'Projets distincts', v: String(projetColors.size) },
+              { l: 'Taches planifiees', v: String(totalTaches) },
             ].map((s, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
                 <span style={{ fontSize: '11px', color: C.textMuted }}>{s.l}</span>

@@ -41,9 +41,32 @@ export interface SlotDTO {
   alloc: number;
 }
 
+export interface TacheJourDTO {
+  id: number;
+  projetId: number;
+  projet: string;
+  tache: string;
+  ordreJour: number;
+}
+
+export interface TacheCollaborateurDTO {
+  id: number;
+  projetId: number;
+  projetNom: string;
+  collaborateurId: number;
+  collaborateurNomComplet: string;
+  matricule: string | null;
+  tache: string;
+  dateTache: string;
+  ordreJour: number;
+  dateDebutV2: string;
+  dateFinV2: string;
+}
+
 export interface CollabPlanningJourDTO {
   date: string; // ISO yyyy-MM-dd
   slots: SlotDTO[];
+  taches: TacheJourDTO[];
 }
 
 /* ─── API calls ─── */
@@ -62,4 +85,12 @@ export function fetchCollabProjets(): Promise<CollabProjetDTO[]> {
 
 export function fetchCollabPlanning(annee: number, mois: number): Promise<CollabPlanningJourDTO[]> {
   return apiGet<CollabPlanningJourDTO[]>(`/collaborateur/planning?annee=${annee}&mois=${mois}`);
+}
+
+export function fetchCollabTaches(annee?: number, mois?: number): Promise<TacheCollaborateurDTO[]> {
+  const params = new URLSearchParams();
+  if (annee) params.append('annee', String(annee));
+  if (mois) params.append('mois', String(mois));
+  const query = params.toString();
+  return apiGet<TacheCollaborateurDTO[]>(`/collaborateur/taches${query ? '?' + query : ''}`);
 }

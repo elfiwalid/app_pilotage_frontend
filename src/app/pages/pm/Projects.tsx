@@ -14,6 +14,7 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { fetchMesProjets, creerProjet, type ProjetResponseDTO, type ProjetRequestDTO } from '../../services/projetService';
 import { ImportPrevisionModal } from '../../components/prevision/ImportPrevisionModal';
+import { ImportTachesModal } from '../../components/prevision/ImportTachesModal';
 import { PrevisionHistoryView } from '../../components/prevision/PrevisionHistoryView';
 import { PrevisionActiveCard } from '../../components/prevision/PrevisionActiveCard';
 import { PrevisionStatsCard } from '../../components/prevision/PrevisionStatsCard';
@@ -380,7 +381,7 @@ function AddProjectModal({ onClose, onCreated }: {
 /* ─── MODAL: PROJECT DETAIL ─────────────────────── */
 /* ════════════════════════════════════════════════ */
 function ProjectDetailModal({
-  project, onClose, onAnalyze, onPredictV2, onImportPrevision, onShowHistory,
+  project, onClose, onAnalyze, onPredictV2, onImportPrevision, onImportTaches, onShowHistory,
   refreshKey,
 }: {
   project: Project;
@@ -388,6 +389,7 @@ function ProjectDetailModal({
   onAnalyze: () => void;
   onPredictV2: () => void;
   onImportPrevision: () => void;
+  onImportTaches: () => void;
   onShowHistory: () => void;
   refreshKey: number;
 }) {
@@ -450,6 +452,13 @@ function ProjectDetailModal({
               >
                 <Upload style={{ width: '12px', height: '12px' }} />Importer une prévision
               </button>
+              <button onClick={onImportTaches}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: R, border: `1px solid ${C.blue}30`, backgroundColor: C.blue, color: '#fff', cursor: 'pointer', fontSize: '11px', fontWeight: 700 }}
+                onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
+                onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+              >
+                <Upload style={{ width: '12px', height: '12px' }} />Importer les tÃ¢ches
+              </button>
               <button onClick={onShowHistory}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: R, border: `1px solid ${C.border}`, backgroundColor: '#fff', color: C.text, cursor: 'pointer', fontSize: '11px', fontWeight: 700 }}
                 onMouseEnter={e => (e.currentTarget.style.backgroundColor = C.bg)}
@@ -510,6 +519,7 @@ export function PmProjects() {
 
   /* ─── Prevision integration state ─── */
   const [importModalOpen, setImportModalOpen] = useState(false);
+  const [tasksImportOpen, setTasksImportOpen] = useState(false);
   const [historyOpen, setHistoryOpen]         = useState(false);
   const [refreshKey, setRefreshKey]           = useState(0);
 
@@ -682,6 +692,7 @@ export function PmProjects() {
           onAnalyze={() => { setDetailProj(null); setAnalyzeProj(detailProj); }}
           onPredictV2={() => { setDetailProj(null); setPredictProj(detailProj); }}
           onImportPrevision={() => setImportModalOpen(true)}
+          onImportTaches={() => setTasksImportOpen(true)}
           onShowHistory={() => setHistoryOpen(true)}
           refreshKey={refreshKey}
         />
@@ -693,6 +704,16 @@ export function PmProjects() {
           isOpen={importModalOpen}
           onClose={() => setImportModalOpen(false)}
           projetId={detailProj.id}
+          onSuccess={() => setRefreshKey(k => k + 1)}
+        />
+      )}
+
+      {detailProj && tasksImportOpen && (
+        <ImportTachesModal
+          isOpen={tasksImportOpen}
+          onClose={() => setTasksImportOpen(false)}
+          projetId={detailProj.id}
+          projetNom={detailProj.nom}
           onSuccess={() => setRefreshKey(k => k + 1)}
         />
       )}

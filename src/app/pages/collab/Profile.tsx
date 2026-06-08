@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { C, R, PageHeader, SectionCard, BtnPrimary, BtnGhost, cardStyle } from '../../components/ui/design-system';
 import { fetchMyProfile, updateMyProfile, type UserResponseDTO } from '../../services/userService';
 import { fetchMesEvaluations, type EvaluationResponse } from '../../services/evaluationService';
+import { fetchCollabTaches, type TacheCollaborateurDTO } from '../../services/collaborateurService';
 
 const MOIS_LABELS: Record<number, string> = {
   1: 'Janvier', 2: 'Février', 3: 'Mars', 4: 'Avril', 5: 'Mai', 6: 'Juin',
@@ -14,6 +15,7 @@ export function CollabProfile() {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<UserResponseDTO | null>(null);
   const [evaluations, setEvaluations] = useState<EvaluationResponse[]>([]);
+  const [taches, setTaches] = useState<TacheCollaborateurDTO[]>([]);
   const [editing, setEditing] = useState(false);
 
   // Editable form state
@@ -29,9 +31,10 @@ export function CollabProfile() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [profileData, evalData] = await Promise.all([
+      const [profileData, evalData, tachesData] = await Promise.all([
         fetchMyProfile(),
         fetchMesEvaluations(),
+        fetchCollabTaches(),
       ]);
       setProfile(profileData);
       setNom(profileData.nom);
@@ -39,6 +42,7 @@ export function CollabProfile() {
       setEmail(profileData.email);
       setPoste(profileData.poste || '');
       setEvaluations(evalData);
+      setTaches(tachesData);
     } catch (err: any) {
       toast.error(err.message || 'Erreur de chargement du profil');
     } finally {
@@ -245,6 +249,26 @@ export function CollabProfile() {
               <div style={{ display: 'flex', gap: '8px', marginTop: '14px', paddingTop: '12px', borderTop: `1px solid ${C.borderLight}` }}>
                 <BtnPrimary onClick={handleSave}><Save style={{ width: '12px', height: '12px' }} />Enregistrer</BtnPrimary>
                 <BtnGhost onClick={handleCancel}>Annuler</BtnGhost>
+              </div>
+            )}
+          </SectionCard>
+
+          <SectionCard title="Mes Tâches Planifiées" subtitle={`${taches.length} jour(s) planifié(s)`} accent={C.blue}>
+            {taches.length === 0 ? (
+              <div style={{ padding: '16px', textAlign: 'center' }}>
+                <p style={{ fontSize: '12px', color: C.textMuted }}>Aucune tâche planifiée pour le moment.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {taches.slice(0, 8).map(t => (
+                  <div key={t.id} style={{ padding: '10px 12px', borderRadius: R, border: `1px solid ${C.border}`, backgroundColor: C.bg }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', marginBottom: '3px' }}>
+                      <p style={{ fontSize: '12px', fontWeight: 700, color: C.text }}>{t.tache}</p>
+                      <span style={{ fontSize: '10px', color: C.textMuted, flexShrink: 0 }}>{formatDateFr(t.dateTache)}</span>
+                    </div>
+                    <p style={{ fontSize: '10px', color: C.textMuted }}>{t.projetNom}</p>
+                  </div>
+                ))}
               </div>
             )}
           </SectionCard>
