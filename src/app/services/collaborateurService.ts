@@ -48,8 +48,12 @@ export interface CollabPlanningJourDTO {
 
 /* ─── API calls ─── */
 
-export function fetchCollabDashboard(): Promise<CollabDashboardDTO> {
-  return apiGet<CollabDashboardDTO>('/collaborateur/dashboard');
+export function fetchCollabDashboard(annee?: number, mois?: number): Promise<CollabDashboardDTO> {
+  const params = new URLSearchParams();
+  if (annee) params.append('annee', String(annee));
+  if (mois) params.append('mois', String(mois));
+  const query = params.toString();
+  return apiGet<CollabDashboardDTO>(`/collaborateur/dashboard${query ? '?' + query : ''}`);
 }
 
 export function fetchCollabProjets(): Promise<CollabProjetDTO[]> {

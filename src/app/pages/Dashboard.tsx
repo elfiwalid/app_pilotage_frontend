@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { TrendingUp, Users, AlertTriangle, UserCheck, UserX, ArrowUpRight, Loader2 } from 'lucide-react';
+import { TrendingUp, Users, AlertTriangle, UserCheck, UserX, ArrowUpRight, Loader2, Calendar, RefreshCw } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { C, S, R, PageHeader, SectionCard, KpiCard, cardStyle } from '../components/ui/design-system';
 import { useNavigate } from 'react-router';
@@ -38,12 +38,25 @@ export function Dashboard() {
   const [data, setData] = useState<RmDashboardDTO | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchRmDashboard()
-      .then(setData)
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+  const now = new Date();
+  const [selAnnee, setSelAnnee] = useState(now.getFullYear());
+  const [selMois, setSelMois] = useState(now.getMonth() + 1);
+
+  const MOIS_OPTIONS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const d = await fetchRmDashboard(selAnnee, selMois);
+      setData(d);
+    } catch {
+      setData(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { loadData(); }, [selAnnee, selMois]);
 
   if (loading) {
     return (
@@ -61,7 +74,7 @@ export function Dashboard() {
     );
   }
 
-  const today = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+  const periodeLabel = `${MOIS_OPTIONS[selMois - 1]} ${selAnnee}`;
 
   const kpiData = [
     { title: 'Taux de Staffing', value: `${data.tauxStaffingGlobal}%`, trendPositive: data.tauxStaffingGlobal >= 90, icon: UserCheck, accent: C.purple, sub: 'moyenne globale' },
@@ -82,7 +95,24 @@ export function Dashboard() {
     <div style={{ padding: '20px', backgroundColor: C.bg, minHeight: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
       {/* Header */}
-      <PageHeader title="Dashboard — Vue Globale" subtitle={`Pilotage des ressources et détection des anomalies de staffing · ${today}`} />
+      <PageHeader title="Dashboard — Vue Globale" subtitle={`Pilotage des ressources et détection des anomalies de staffing · ${periodeLabel}`}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Calendar style={{ width: '14px', height: '14px', color: C.textMuted }} />
+          <select value={selMois} onChange={e => setSelMois(Number(e.target.value))}
+            style={{ padding: '5px 8px', fontSize: '12px', fontWeight: 600, border: `1px solid ${C.border}`, borderRadius: R, backgroundColor: '#fff', cursor: 'pointer', outline: 'none' }}>
+            {MOIS_OPTIONS.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
+          </select>
+          <select value={selAnnee} onChange={e => setSelAnnee(Number(e.target.value))}
+            style={{ padding: '5px 8px', fontSize: '12px', fontWeight: 600, border: `1px solid ${C.border}`, borderRadius: R, backgroundColor: '#fff', cursor: 'pointer', outline: 'none' }}>
+            {[2025, 2026, 2027, 2028].map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+          <button onClick={loadData} disabled={loading}
+            style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 10px', borderRadius: R, border: `1px solid ${C.border}`, background: '#fff', color: C.textMuted, fontSize: '11px', fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1 }}>
+            <RefreshCw style={{ width: '12px', height: '12px', animation: loading ? 'spin 1s linear infinite' : 'none' }} />
+          </button>
+          <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+        </div>
+      </PageHeader>
 
       {/* KPI Strip */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: '12px' }}>

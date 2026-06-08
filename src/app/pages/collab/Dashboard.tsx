@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Briefcase, Clock, CheckSquare, ArrowUpRight, TrendingUp, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Briefcase, Clock, CheckSquare, ArrowUpRight, TrendingUp, Loader2, AlertTriangle, RefreshCw, Calendar } from 'lucide-react';
 import { RadialBarChart, RadialBar, PolarAngleAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { C, S, R, PageHeader, SectionCard, KpiCard } from '../../components/ui/design-system';
 import { useNavigate } from 'react-router';
@@ -40,11 +40,17 @@ export function CollabDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const now = new Date();
+  const [selAnnee, setSelAnnee] = useState(now.getFullYear());
+  const [selMois, setSelMois] = useState(now.getMonth() + 1);
+
+  const MOIS_LABELS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+
   const load = async () => {
     setLoading(true);
     setError(null);
     try {
-      const d = await fetchCollabDashboard();
+      const d = await fetchCollabDashboard(selAnnee, selMois);
       setData(d);
     } catch (err: any) {
       setError(err.message || 'Impossible de charger le dashboard.');
@@ -53,7 +59,7 @@ export function CollabDashboard() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [selAnnee, selMois]);
 
   if (loading) {
     return (
@@ -81,7 +87,7 @@ export function CollabDashboard() {
     );
   }
 
-  const today = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+  const periodeLabel = `${MOIS_LABELS[selMois - 1]} ${selAnnee}`;
   const projetsActifs = data.projets.filter(p => p.statut === 'EN_COURS');
 
   // KPIs
@@ -105,7 +111,23 @@ export function CollabDashboard() {
     <div style={{ padding: '20px', backgroundColor: C.bg, minHeight: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
       {/* Header */}
-      <PageHeader title="Mon Dashboard" subtitle={`Vue personnelle de vos projets et tâches · ${user?.name ?? ''} · ${today}`} />
+      <PageHeader title="Mon Dashboard" subtitle={`Vue personnelle de vos projets et tâches · ${user?.name ?? ''} · ${periodeLabel}`}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Calendar style={{ width: '14px', height: '14px', color: C.textMuted }} />
+          <select value={selMois} onChange={e => setSelMois(Number(e.target.value))}
+            style={{ padding: '5px 8px', fontSize: '12px', fontWeight: 600, border: `1px solid ${C.border}`, borderRadius: R, backgroundColor: '#fff', cursor: 'pointer', outline: 'none' }}>
+            {MOIS_LABELS.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
+          </select>
+          <select value={selAnnee} onChange={e => setSelAnnee(Number(e.target.value))}
+            style={{ padding: '5px 8px', fontSize: '12px', fontWeight: 600, border: `1px solid ${C.border}`, borderRadius: R, backgroundColor: '#fff', cursor: 'pointer', outline: 'none' }}>
+            {[2025, 2026, 2027, 2028].map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+          <button onClick={load} disabled={loading}
+            style={{ display: 'flex', alignItems: 'center', padding: '5px 10px', borderRadius: R, border: `1px solid ${C.border}`, background: '#fff', color: C.textMuted, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1 }}>
+            <RefreshCw style={{ width: '12px', height: '12px', animation: loading ? 'spin 1s linear infinite' : 'none' }} />
+          </button>
+        </div>
+      </PageHeader>
 
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '12px' }}>

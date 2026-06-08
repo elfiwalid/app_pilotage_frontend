@@ -74,8 +74,12 @@ export interface RmDashboardDTO {
   anomaliesMensuelles: { mois: string; surcharge: number; sousUtilisation: number; conflit: number }[];
 }
 
-export function fetchRmDashboard(): Promise<RmDashboardDTO> {
-  return apiGet<RmDashboardDTO>('/rm/dashboard');
+export function fetchRmDashboard(annee?: number, mois?: number): Promise<RmDashboardDTO> {
+  const params = new URLSearchParams();
+  if (annee) params.append('annee', String(annee));
+  if (mois) params.append('mois', String(mois));
+  const query = params.toString();
+  return apiGet<RmDashboardDTO>(`/rm/dashboard${query ? '?' + query : ''}`);
 }
 
 export function fetchRmProjets(): Promise<RmProjetDTO[]> {
