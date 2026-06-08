@@ -79,24 +79,44 @@ export interface SimulationSousChargeResponse {
   nouveauConflit: boolean;
 }
 
+export type SimulationResult =
+    | SimulationRemplacementResponse
+    | SimulationSousChargeResponse;
+
 /* ─── API Calls ─── */
 
 /** Lancer une simulation de remplacement. */
-export function simulerRemplacement(request: SimulationRemplacementRequest): Promise<SimulationRemplacementResponse> {
-  return apiPost<SimulationRemplacementResponse>('/simulations/what-if/remplacement', request);
+export function simulerRemplacement(
+    request: SimulationRemplacementRequest
+): Promise<SimulationRemplacementResponse> {
+  return apiPost<SimulationRemplacementResponse>(
+      '/simulations/what-if/remplacement',
+      request
+  );
 }
 
 /** Lancer une simulation sous-charge. */
-export function simulerSousCharge(request: SimulationSousChargeRequest): Promise<SimulationSousChargeResponse> {
-  return apiPost<SimulationSousChargeResponse>('/simulations/what-if/sous-charge', request);
+export function simulerSousCharge(
+    request: SimulationSousChargeRequest
+): Promise<SimulationSousChargeResponse> {
+  return apiPost<SimulationSousChargeResponse>(
+      '/simulations/what-if/sous-charge',
+      request
+  );
 }
 
 /** Valider une simulation (appliquer le remplacement/ajout réel). */
 export function validerSimulation(simulationId: number): Promise<void> {
-  return apiPost<void>(`/simulations/what-if/${simulationId}/valider`, {});
+  return apiPost<void>(
+      `/simulations/what-if/${simulationId}/valider`,
+      {}
+  );
 }
 
 /** Annuler une simulation. */
 export function annulerSimulation(simulationId: number): Promise<void> {
-  return apiPost<void>(`/simulations/what-if/${simulationId}/annuler`, {});
+  return apiPost<void>(
+      `/simulations/what-if/${simulationId}/annuler`,
+      {}
+  );
 }
