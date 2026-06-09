@@ -12,6 +12,7 @@ import { Settings } from './pages/Settings';
 import { RmProfile } from './pages/rm/Profile';
 import { RmNotifications } from './pages/rm/Notifications';
 import { Import } from './pages/Import';
+import { Conversations } from './pages/Conversations';
 
 // PM Pages
 import { PmDashboard } from './pages/pm/Dashboard';
@@ -42,6 +43,7 @@ export const router = createBrowserRouter(
         { path: 'import', Component: Import },
         { path: 'conflicts', Component: Conflicts },
         { path: 'simulation', Component: Simulation },
+        { path: 'conversations', Component: Conversations },
         { path: 'settings', Component: Settings },
         { path: 'rm/profile', Component: RmProfile },
         { path: 'rm/notifications', Component: RmNotifications },
@@ -51,6 +53,7 @@ export const router = createBrowserRouter(
         { path: 'pm/projects', Component: PmProjects },
         { path: 'pm/anomalies', Component: PmAnomalies },
         { path: 'pm/reports', Component: PmReports },
+        { path: 'pm/conversations', Component: Conversations },
         { path: 'pm/profile', Component: PmProfile },
         { path: 'pm/notifications', Component: PmNotifications },
 

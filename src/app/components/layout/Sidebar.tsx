@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import {
   LayoutDashboard, Users, FolderKanban, AlertTriangle,
   Lightbulb, Settings, BookOpen, Briefcase, BarChart2,
-  Calendar, Bell, UserCircle, Upload,
+  Calendar, Bell, UserCircle, Upload, MessageSquare,
 } from 'lucide-react';
 import { C, R } from '../ui/design-system';
 import { useRole, ROLE_DASHBOARDS, type Role } from '../../context/RoleContext';
@@ -50,7 +50,12 @@ export function Sidebar() {
           { name: 'Conflits', href: '/conflicts', icon: AlertTriangle, badge: counts.anomalies },
         ],
       },
-      { label: 'Analytique', items: [{ name: 'Simulation', href: '/simulation', icon: Lightbulb }] },
+      {
+        label: 'Analytique', items: [
+          { name: 'Simulation', href: '/simulation', icon: Lightbulb },
+          { name: 'Conversations', href: '/conversations', icon: MessageSquare },
+        ],
+      },
       {
         label: 'Compte', items: [
           { name: 'Notifications', href: '/rm/notifications', icon: Bell, badge: counts.notifications },
@@ -66,6 +71,7 @@ export function Sidebar() {
           { name: 'Mes Projets', href: '/pm/projects', icon: Briefcase },
           { name: 'Import Excel', href: '/import', icon: Upload },
           { name: 'Anomalies', href: '/pm/anomalies', icon: AlertTriangle, badge: counts.anomalies },
+          { name: 'Propositions', href: '/pm/conversations', icon: MessageSquare },
         ],
       },
       { label: 'Rapports', items: [{ name: 'Rapports', href: '/pm/reports', icon: BarChart2 }] },
