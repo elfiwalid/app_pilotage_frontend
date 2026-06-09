@@ -317,7 +317,7 @@ function ProjectDetailModal({
                 onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
                 onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
               >
-                <Upload style={{ width: '12px', height: '12px' }} />Importer les tÃ¢ches
+                <Upload style={{ width: '12px', height: '12px' }} />Importer les tâches
               </button>
               <button onClick={onShowHistory}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: R, border: `1px solid ${C.border}`, backgroundColor: '#fff', color: C.text, cursor: 'pointer', fontSize: '11px', fontWeight: 700 }}

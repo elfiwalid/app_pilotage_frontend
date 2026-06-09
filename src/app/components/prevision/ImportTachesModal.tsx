@@ -110,14 +110,14 @@ export function ImportTachesModal({
       clearInterval(progressInterval);
       setProgress(100);
       toast.success(
-        `Taches importees : ${result.tachesPlanifiees} jour(s) planifie(s) pour ${result.collaborateursConcernes} collaborateur(s).`
+        `Tâches importées : ${result.tachesPlanifiees} jour(s) planifié(s) pour ${result.collaborateursConcernes} collaborateur(s).`
       );
       onSuccess?.();
       setTimeout(handleClose, 300);
     } catch (err: any) {
       clearInterval(progressInterval);
       setProgress(0);
-      toast.error(err.message || "Echec de l'import des taches.");
+      toast.error(err.message || "Échec de l'import des tâches.");
     } finally {
       setUploading(false);
     }
@@ -136,8 +136,8 @@ export function ImportTachesModal({
   return (
     <Modal onClose={handleClose} maxWidth="520px" accentColor={C.blue}>
       <ModalHeader
-        title="Importer les taches"
-        subtitle={projetNom ? `${projetNom} - fichier Excel des taches` : 'Fichier Excel des taches'}
+        title="Importer les tâches"
+        subtitle={projetNom ? `${projetNom} - fichier Excel des tâches` : 'Fichier Excel des tâches'}
         onClose={handleClose}
       />
       <div style={{ padding: '16px 20px' }}>
@@ -228,7 +228,7 @@ export function ImportTachesModal({
                 {uploading && <Loader2 style={{ width: '12px', height: '12px', animation: 'spin 1s linear infinite' }} />}
                 {!uploading && progress === 100 && <CheckCircle style={{ width: '12px', height: '12px' }} />}
                 {!uploading && progress !== 100 && <Upload style={{ width: '12px', height: '12px' }} />}
-                {uploading ? 'Import en cours...' : 'Importer les taches'}
+                {uploading ? 'Import en cours...' : 'Importer les tâches'}
               </BtnPrimary>
               <BtnGhost onClick={handleClose}>Annuler</BtnGhost>
             </div>
