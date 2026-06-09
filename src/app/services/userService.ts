@@ -6,6 +6,7 @@ export interface UserResponseDTO {
   prenom: string;
   email: string;
   poste: string;
+  photoUrl?: string | null;
   matricule: string;
   tauxStaffing: number;
   disponible: boolean;
@@ -34,6 +35,7 @@ export function updateMyProfile(data: {
   prenom: string;
   email: string;
   poste: string;
+  photoUrl?: string | null;
 }): Promise<UserResponseDTO> {
   return apiPut<UserResponseDTO>('/users/me', data);
 }

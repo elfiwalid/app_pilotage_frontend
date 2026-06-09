@@ -64,7 +64,6 @@ export function Sidebar() {
       {
         label: 'Gestion', items: [
           { name: 'Mes Projets', href: '/pm/projects', icon: Briefcase },
-          { name: 'Import Excel', href: '/import', icon: Upload },
           { name: 'Anomalies', href: '/pm/anomalies', icon: AlertTriangle, badge: counts.anomalies },
         ],
       },
