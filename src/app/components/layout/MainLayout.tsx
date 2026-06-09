@@ -9,16 +9,15 @@ import { ROLE_DASHBOARDS } from '../../context/RoleContext';
  * Détermine si une route est accessible pour un rôle donné.
  * - rm  : routes commençant par /pm ou /collab → interdit
  * - pm  : routes commençant par /collab ou pages RM uniquement → interdit
- * - collab : seulement les routes /collab et /import (lecture)
+ * - collab : seulement les routes /collab
  */
 function isRouteAllowed(pathname: string, role: 'rm' | 'pm' | 'collab'): boolean {
   if (role === 'rm') {
     return !pathname.startsWith('/pm') && !pathname.startsWith('/collab');
   }
   if (role === 'pm') {
-    // Le PM peut accéder à /pm/* et /import (partagé)
+    // Le PM peut accéder uniquement à /pm/*.
     if (pathname.startsWith('/pm')) return true;
-    if (pathname === '/import') return true;
     return false;
   }
   // collab : uniquement /collab/*

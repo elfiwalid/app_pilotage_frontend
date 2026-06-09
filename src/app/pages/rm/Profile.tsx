@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Mail, Phone, MapPin, Shield, Edit3, Save, Camera, Activity, CheckCircle, Calendar, RefreshCcw, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router';
@@ -33,6 +33,7 @@ export function RmProfile() {
   const [prenom, setPrenom] = useState('');
   const [email, setEmail] = useState('');
   const [poste, setPoste] = useState('');
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadData();
@@ -56,7 +57,7 @@ export function RmProfile() {
 
   const handleSave = async () => {
     try {
-      const updated = await updateMyProfile({ nom, prenom, email, poste });
+      const updated = await updateMyProfile({ nom, prenom, email, poste, photoUrl: profile?.photoUrl ?? null });
       setProfile(updated);
       setEditing(false);
       toast.success('Profil mis à jour avec succès !');
@@ -79,6 +80,28 @@ export function RmProfile() {
     setRole(r);
     navigate(ROLE_DASHBOARDS[r]);
     toast.success(`Profil changé → ${ROLE_LABELS[r]}`);
+  };
+
+  const handlePhotoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !profile) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Veuillez sélectionner une image.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const photoUrl = String(reader.result);
+        const updated = await updateMyProfile({ nom, prenom, email, poste, photoUrl });
+        setProfile(updated);
+        toast.success('Photo de profil mise à jour.');
+      } catch (err: any) {
+        toast.error(err.message || 'Impossible de mettre à jour la photo.');
+      }
+    };
+    reader.readAsDataURL(file);
+    event.target.value = '';
   };
 
   const inputStyle: React.CSSProperties = {
@@ -122,8 +145,11 @@ export function RmProfile() {
           {/* Avatar card */}
           <div style={{ ...cardStyle, borderTop: `3px solid ${C.magenta}`, padding: '20px', textAlign: 'center' }}>
             <div style={{ position: 'relative', display: 'inline-block', marginBottom: '14px' }}>
-              <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: 'linear-gradient(135deg, #7B2CBF 0%, #E600A9 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '24px', fontWeight: 800, margin: '0 auto' }}>{initials}</div>
-              <button onClick={() => toast.info('Modifier la photo de profil')} style={{ position: 'absolute', bottom: 0, right: 0, width: '22px', height: '22px', borderRadius: '50%', backgroundColor: C.magenta, border: '2px solid white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: 'linear-gradient(135deg, #7B2CBF 0%, #E600A9 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '24px', fontWeight: 800, margin: '0 auto', overflow: 'hidden' }}>
+                {profile.photoUrl ? <img src={profile.photoUrl} alt={fullName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
+              </div>
+              <input ref={photoInputRef} type="file" accept="image/*" onChange={handlePhotoChange} style={{ display: 'none' }} />
+              <button onClick={() => photoInputRef.current?.click()} style={{ position: 'absolute', bottom: 0, right: 0, width: '22px', height: '22px', borderRadius: '50%', backgroundColor: C.magenta, border: '2px solid white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Camera style={{ width: '11px', height: '11px', color: '#fff' }} />
               </button>
             </div>

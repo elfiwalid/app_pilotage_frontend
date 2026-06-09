@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import {
   Plus, AlertTriangle, Calendar, ChevronRight,
-  Search, CheckCircle, TrendingUp, Info, Zap, Loader2,
-  Upload, History,
+  Search, CheckCircle, Info, Loader2,
+  Upload, History, Trash2,
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
@@ -12,7 +12,7 @@ import {
 } from '../../components/ui/design-system';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { fetchMesProjets, creerProjet, type ProjetResponseDTO, type ProjetRequestDTO } from '../../services/projetService';
+import { fetchMesProjets, creerProjet, supprimerProjet, type ProjetResponseDTO, type ProjetRequestDTO } from '../../services/projetService';
 import { ImportPrevisionModal } from '../../components/prevision/ImportPrevisionModal';
 import { ImportTachesModal } from '../../components/prevision/ImportTachesModal';
 import { PrevisionHistoryView } from '../../components/prevision/PrevisionHistoryView';
@@ -31,7 +31,6 @@ interface Project {
   chefProjetId: number;
   chefProjetNomComplet: string;
   dateCreation: string;
-  v2?: { type: 'trimestriel' | 'annuel'; tjm: number; collabs: string[] };
 }
 
 /* ─── STATUS MAP ────────────────────────────────── */
@@ -42,11 +41,10 @@ const STATUS_MAP: Record<string, { label: string; bg: string; text: string; dot:
   'SUSPENDU': { label: 'Suspendu', bg: '#FEF2F2', text: '#991B1B', dot: C.red, accent: C.red },
 };
 
-const COLLABS = ['Youssef El Amrani', 'Sara Benali', 'Mohamed Alaoui', 'Salma Idrissi', 'Ahmed Chafik', 'Imane El Fassi', 'Hamza Lahlou'];
 
 /* ─── Helpers ───────────────────────────────────── */
 function toProject(dto: ProjetResponseDTO): Project {
-  return { ...dto, v2: undefined };
+  return { ...dto };
 }
 
 function formatDate(isoDate: string): string {
@@ -66,139 +64,6 @@ function formatDateShort(isoDate: string): string {
 }
 
 /* ════════════════════════════════════════════════ */
-/* ─── MODAL: PREDICT V2 ─────────────────────────── */
-/* ════════════════════════════════════════════════ */
-function PredictV2Modal({ project, onClose, onSave }: {
-  project: Project;
-  onClose: () => void;
-  onSave: (id: number, v2: NonNullable<Project['v2']>) => void;
-}) {
-  const [v2Type, setV2Type]     = useState<'trimestriel' | 'annuel'>('trimestriel');
-  const [nomProjet, setNom]     = useState(project.nom);
-  const [tjm, setTjm]           = useState('650');
-  const [startDate, setStart]   = useState('2026-01-01');
-  const [endDate, setEnd]       = useState('2026-03-31');
-  const [collabs, setCollabs]   = useState<string[]>([]);
-
-  const selectType = (t: 'trimestriel' | 'annuel') => {
-    setV2Type(t);
-    if (t === 'trimestriel') { setStart('2026-01-01'); setEnd('2026-03-31'); }
-    else                     { setStart('2026-04-01'); setEnd('2026-12-31'); }
-  };
-
-  const toggleCollab = (c: string) =>
-    setCollabs(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const v2: NonNullable<Project['v2']> = { type: v2Type, tjm: Number(tjm), collabs };
-    onSave(project.id, v2);
-    toast.success(`Prédiction V2 ${v2Type === 'trimestriel' ? 'Trimestrielle (Jan–Mar)' : 'Annuelle (Avr–Déc)'} créée pour ${nomProjet} !`);
-    onClose();
-  };
-
-  const inp: React.CSSProperties = { width: '100%', padding: '7px 10px', fontSize: '12px', border: `1px solid ${C.border}`, borderRadius: R, backgroundColor: '#fff', outline: 'none', fontFamily: 'Inter', color: C.text, boxSizing: 'border-box' };
-  const lbl: React.CSSProperties = { fontSize: '10px', fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '4px' };
-
-  const periodLabel = v2Type === 'trimestriel' ? 'Janvier – Mars 2026' : 'Avril – Décembre 2026';
-
-  return (
-    <Modal onClose={onClose} maxWidth="600px" accentColor={C.purple}>
-      <ModalHeader title="Prédiction V2" subtitle={`${project.nom} — Formulaire de prévision`} onClose={onClose} />
-      <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-
-        {/* V2 type selector */}
-        <div>
-          <p style={{ ...lbl, marginBottom: '8px' }}>Type de prédiction</p>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-            {([
-              ['trimestriel', 'V2 Trimestrielle', 'Janvier – Mars 2026'],
-              ['annuel',      'V2 Annuelle',       'Avril – Décembre 2026'],
-            ] as const).map(([val, label, sub]) => {
-              const active = v2Type === val;
-              return (
-                <div key={val} onClick={() => selectType(val)}
-                  style={{ padding: '12px 14px', borderRadius: R, border: `2px solid ${active ? C.purple : C.border}`, backgroundColor: active ? `${C.purple}08` : '#fff', cursor: 'pointer', transition: 'all 0.15s' }}
-                  onMouseEnter={e => { if (!active) (e.currentTarget as HTMLDivElement).style.borderColor = `${C.purple}60`; }}
-                  onMouseLeave={e => { if (!active) (e.currentTarget as HTMLDivElement).style.borderColor = C.border; }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
-                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: active ? C.purple : C.borderLight, transition: 'background 0.15s' }} />
-                    <p style={{ fontSize: '13px', fontWeight: 700, color: active ? C.purple : C.text }}>{label}</p>
-                  </div>
-                  <p style={{ fontSize: '11px', color: C.textMuted, paddingLeft: '16px' }}>{sub}</p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              <div>
-                <label style={lbl}>Nom du projet *</label>
-                <input required type="text" value={nomProjet} onChange={e => setNom(e.target.value)} style={inp}
-                  onFocus={e => (e.target.style.borderColor = C.purple)} onBlur={e => (e.target.style.borderColor = C.border)} />
-              </div>
-              <div>
-                <label style={lbl}>TJM prédit (€/jour) *</label>
-                <input required type="number" value={tjm} onChange={e => setTjm(e.target.value)} placeholder="Ex: 650" style={inp}
-                  onFocus={e => (e.target.style.borderColor = C.purple)} onBlur={e => (e.target.style.borderColor = C.border)} />
-              </div>
-              <div>
-                <label style={lbl}>Date début</label>
-                <input type="date" value={startDate} onChange={e => setStart(e.target.value)} style={inp}
-                  onFocus={e => (e.target.style.borderColor = C.purple)} onBlur={e => (e.target.style.borderColor = C.border)} />
-              </div>
-              <div>
-                <label style={lbl}>Date fin</label>
-                <input type="date" value={endDate} onChange={e => setEnd(e.target.value)} style={inp}
-                  onFocus={e => (e.target.style.borderColor = C.purple)} onBlur={e => (e.target.style.borderColor = C.border)} />
-              </div>
-            </div>
-
-            {/* Collaborateurs */}
-            <div>
-              <label style={{ ...lbl, marginBottom: '8px' }}>Collaborateurs affectés</label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-                {COLLABS.map(c => {
-                  const sel = collabs.includes(c);
-                  return (
-                    <button key={c} type="button" onClick={() => toggleCollab(c)}
-                      style={{ padding: '4px 10px', borderRadius: '20px', border: `1px solid ${sel ? C.purple : C.border}`, backgroundColor: sel ? `${C.purple}12` : '#fff', color: sel ? C.purple : C.textMuted, cursor: 'pointer', fontSize: '11px', fontWeight: sel ? 700 : 400, transition: 'all 0.12s' }}>
-                      {sel && '✓ '}{c.split(' ')[0]}
-                    </button>
-                  );
-                })}
-              </div>
-              {collabs.length > 0 && <p style={{ fontSize: '10px', color: C.textMuted, marginTop: '5px' }}>{collabs.length} collaborateur{collabs.length > 1 ? 's' : ''} sélectionné{collabs.length > 1 ? 's' : ''}</p>}
-            </div>
-
-            {/* Summary */}
-            <div style={{ padding: '10px 14px', borderRadius: R, backgroundColor: `${C.purple}06`, border: `1px solid ${C.purple}25` }}>
-              <p style={{ fontSize: '11px', fontWeight: 700, color: C.purple, marginBottom: '3px' }}>
-                Récapitulatif — {v2Type === 'trimestriel' ? 'V2 Trimestrielle' : 'V2 Annuelle'}
-              </p>
-              <p style={{ fontSize: '11px', color: C.textSecondary }}>
-                {periodLabel} · TJM : {tjm}€/j · {collabs.length} collaborateur{collabs.length > 1 ? 's' : ''}
-              </p>
-            </div>
-
-            <div style={{ display: 'flex', gap: '8px', paddingTop: '8px', borderTop: `1px solid ${C.borderLight}` }}>
-              <BtnPrimary>
-                <TrendingUp style={{ width: '12px', height: '12px' }} />Créer la prédiction V2
-              </BtnPrimary>
-              <BtnGhost onClick={onClose}>Annuler</BtnGhost>
-            </div>
-          </div>
-        </form>
-      </div>
-    </Modal>
-  );
-}
-
 /* ════════════════════════════════════════════════ */
 /* ─── MODAL: ANALYZE PER PROJECT ────────────────── */
 /* ════════════════════════════════════════════════ */
@@ -381,16 +246,16 @@ function AddProjectModal({ onClose, onCreated }: {
 /* ─── MODAL: PROJECT DETAIL ─────────────────────── */
 /* ════════════════════════════════════════════════ */
 function ProjectDetailModal({
-  project, onClose, onAnalyze, onPredictV2, onImportPrevision, onImportTaches, onShowHistory,
+  project, onClose, onAnalyze, onImportPrevision, onImportTaches, onShowHistory, onDelete,
   refreshKey,
 }: {
   project: Project;
   onClose: () => void;
   onAnalyze: () => void;
-  onPredictV2: () => void;
   onImportPrevision: () => void;
   onImportTaches: () => void;
   onShowHistory: () => void;
+  onDelete: () => void;
   refreshKey: number;
 }) {
   const sc = STATUS_MAP[project.statut] || STATUS_MAP['PLANIFIE'];
@@ -405,11 +270,6 @@ function ProjectDetailModal({
           <span style={{ fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: '3px', backgroundColor: sc.bg, color: sc.text, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
             <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: sc.dot }} />{sc.label}
           </span>
-          {project.v2 && (
-            <span style={{ fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: '3px', backgroundColor: `${C.purple}14`, color: C.purple }}>
-              ● V2 {project.v2.type === 'trimestriel' ? 'Trimestrielle' : 'Annuelle'} · {project.v2.tjm}€/j
-            </span>
-          )}
           <span style={{ fontSize: '11px', color: C.textMuted, display: 'flex', alignItems: 'center', gap: '4px' }}>
             <Calendar style={{ width: '12px', height: '12px' }} />
             {formatDate(project.dateDebut)} → {formatDate(project.dateFin)}
@@ -488,12 +348,12 @@ function ProjectDetailModal({
           >
             <AlertTriangle style={{ width: '12px', height: '12px' }} />Analyser anomalies
           </button>
-          <button onClick={onPredictV2}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '7px 14px', borderRadius: R, border: `1px solid ${C.purple}30`, backgroundColor: `${C.purple}08`, color: C.purple, cursor: 'pointer', fontSize: '11px', fontWeight: 700 }}
-            onMouseEnter={e => (e.currentTarget.style.backgroundColor = `${C.purple}15`)}
-            onMouseLeave={e => (e.currentTarget.style.backgroundColor = `${C.purple}08`)}
+          <button onClick={onDelete}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '7px 14px', borderRadius: R, border: `1px solid ${C.red}`, backgroundColor: C.red, color: '#fff', cursor: 'pointer', fontSize: '11px', fontWeight: 700 }}
+            onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#B91C1C')}
+            onMouseLeave={e => (e.currentTarget.style.backgroundColor = C.red)}
           >
-            <TrendingUp style={{ width: '12px', height: '12px' }} />Prédire V2
+            <Trash2 style={{ width: '12px', height: '12px' }} />Supprimer le projet
           </button>
           <BtnGhost onClick={onClose}>Fermer</BtnGhost>
         </div>
@@ -513,9 +373,9 @@ export function PmProjects() {
   const [showAdd, setShowAdd]         = useState(false);
   const [detailProj, setDetailProj]   = useState<Project | null>(null);
   const [analyzeProj, setAnalyzeProj] = useState<Project | null>(null);
-  const [predictProj, setPredictProj] = useState<Project | null>(null);
   const [search, setSearch]           = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [deletingProjectId, setDeletingProjectId] = useState<number | null>(null);
 
   /* ─── Prevision integration state ─── */
   const [importModalOpen, setImportModalOpen] = useState(false);
@@ -548,8 +408,25 @@ export function PmProjects() {
     return matchSearch && (filterStatus === 'all' || p.statut === filterStatus);
   });
 
-  const saveV2 = (id: number, v2: NonNullable<Project['v2']>) =>
-    setProjects(prev => prev.map(p => p.id === id ? { ...p, v2 } : p));
+  const handleDeleteProject = async (project: Project) => {
+    const confirmed = window.confirm(
+      `Supprimer le projet "${project.nom}" ?\n\nLes prévisions, affectations, anomalies et tâches liées seront supprimées.`
+    );
+    if (!confirmed) return;
+
+    try {
+      setDeletingProjectId(project.id);
+      await supprimerProjet(project.id);
+      toast.success('Projet supprimé.');
+      setDetailProj(current => current?.id === project.id ? null : current);
+      setProjects(prev => prev.filter(p => p.id !== project.id));
+      await loadProjects();
+    } catch (err: any) {
+      toast.error(err.message || 'Impossible de supprimer le projet.');
+    } finally {
+      setDeletingProjectId(null);
+    }
+  };
 
   /* ─── Loading state ─── */
   if (loading) {
@@ -628,11 +505,6 @@ export function PmProjects() {
                       <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '3px', backgroundColor: sc.bg, color: sc.text, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                         <span style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: sc.dot }} />{sc.label}
                       </span>
-                      {p.v2 && (
-                        <span style={{ fontSize: '9px', fontWeight: 700, padding: '2px 6px', borderRadius: '3px', backgroundColor: `${C.purple}14`, color: C.purple }}>
-                          ● V2 {p.v2.type === 'trimestriel' ? 'Trim.' : 'Ann.'}
-                        </span>
-                      )}
                     </div>
                     <p style={{ fontSize: '14px', fontWeight: 700, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.nom}</p>
                     <p style={{ fontSize: '11px', color: C.textMuted, marginTop: '2px' }}>{p.chefProjetNomComplet}</p>
@@ -662,6 +534,7 @@ export function PmProjects() {
                 onClick={e => e.stopPropagation()}>
                 <button
                   onClick={() => setAnalyzeProj(p)}
+                  disabled={deletingProjectId === p.id}
                   style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '5px 0', borderRadius: R, border: `1px solid ${C.red}30`, backgroundColor: `${C.red}08`, color: C.red, cursor: 'pointer', fontSize: '10px', fontWeight: 700 }}
                   onMouseEnter={e => (e.currentTarget.style.backgroundColor = `${C.red}15`)}
                   onMouseLeave={e => (e.currentTarget.style.backgroundColor = `${C.red}08`)}
@@ -669,12 +542,18 @@ export function PmProjects() {
                   <AlertTriangle style={{ width: '10px', height: '10px' }} />Analyser
                 </button>
                 <button
-                  onClick={() => setPredictProj(p)}
-                  style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '5px 0', borderRadius: R, border: `1px solid ${C.purple}30`, backgroundColor: `${C.purple}08`, color: C.purple, cursor: 'pointer', fontSize: '10px', fontWeight: 700 }}
-                  onMouseEnter={e => (e.currentTarget.style.backgroundColor = `${C.purple}15`)}
-                  onMouseLeave={e => (e.currentTarget.style.backgroundColor = `${C.purple}08`)}
+                  onClick={() => handleDeleteProject(p)}
+                  disabled={deletingProjectId === p.id}
+                  style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '5px 0', borderRadius: R, border: `1px solid ${C.red}`, backgroundColor: C.red, color: '#fff', cursor: deletingProjectId === p.id ? 'not-allowed' : 'pointer', fontSize: '10px', fontWeight: 700, opacity: deletingProjectId === p.id ? 0.6 : 1 }}
+                  onMouseEnter={e => { if (deletingProjectId !== p.id) e.currentTarget.style.backgroundColor = '#B91C1C'; }}
+                  onMouseLeave={e => (e.currentTarget.style.backgroundColor = C.red)}
                 >
-                  <Zap style={{ width: '10px', height: '10px' }} />Prédire V2
+                  {deletingProjectId === p.id ? (
+                    <Loader2 style={{ width: '10px', height: '10px', animation: 'spin 1s linear infinite' }} />
+                  ) : (
+                    <Trash2 style={{ width: '10px', height: '10px' }} />
+                  )}
+                  Supprimer
                 </button>
               </div>
             </div>
@@ -690,10 +569,10 @@ export function PmProjects() {
           project={detailProj}
           onClose={() => setDetailProj(null)}
           onAnalyze={() => { setDetailProj(null); setAnalyzeProj(detailProj); }}
-          onPredictV2={() => { setDetailProj(null); setPredictProj(detailProj); }}
           onImportPrevision={() => setImportModalOpen(true)}
           onImportTaches={() => setTasksImportOpen(true)}
           onShowHistory={() => setHistoryOpen(true)}
+          onDelete={() => handleDeleteProject(detailProj)}
           refreshKey={refreshKey}
         />
       )}
@@ -723,6 +602,7 @@ export function PmProjects() {
           isOpen={historyOpen}
           onClose={() => setHistoryOpen(false)}
           projetId={detailProj.id}
+          onChanged={() => setRefreshKey(k => k + 1)}
         />
       )}
 
@@ -738,13 +618,6 @@ export function PmProjects() {
         />
       )}
 
-      {predictProj && (
-        <PredictV2Modal
-          project={predictProj}
-          onClose={() => setPredictProj(null)}
-          onSave={saveV2}
-        />
-      )}
     </div>
   );
 }

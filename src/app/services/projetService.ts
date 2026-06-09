@@ -5,7 +5,7 @@
  *   This module handles only projet-related API interactions.
  */
 
-import { apiGet, apiPost } from './api';
+import { apiDelete, apiGet, apiPost } from './api';
 
 /* ─── Request DTO ─────────────────────────────── */
 export interface ProjetRequestDTO {
@@ -41,4 +41,8 @@ export function fetchMesProjets(): Promise<ProjetResponseDTO[]> {
  */
 export function creerProjet(data: ProjetRequestDTO): Promise<ProjetResponseDTO> {
   return apiPost<ProjetResponseDTO>('/projets', data);
+}
+
+export function supprimerProjet(projetId: number): Promise<void> {
+  return apiDelete<void>(`/projets/${projetId}`);
 }

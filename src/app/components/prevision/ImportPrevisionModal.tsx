@@ -14,11 +14,12 @@ interface ImportPrevisionModalProps {
   readonly onSuccess?: () => void;
 }
 
-type TypePrevision = 'TRIMESTRIELLE' | 'ANNUELLE';
 
 /* ─── CONSTANTS ─────────────────────────────────── */
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 Mo
 const ALLOWED_EXTENSIONS = new Set(['xlsx', 'xls']);
+const BACKEND_TYPE_PREVISION = 'TRIMESTRIELLE';
+const MONTH_LABELS = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
 
 /* ─── HELPERS ───────────────────────────────────── */
 function getFileExtension(filename: string): string {
@@ -36,7 +37,6 @@ function formatFileSize(bytes: number): string {
 /* ─── IMPORT PREVISION MODAL ────────────────────── */
 /* ════════════════════════════════════════════════ */
 export function ImportPrevisionModal({ isOpen, onClose, projetId, onSuccess }: ImportPrevisionModalProps) {
-  const [typePrevision, setTypePrevision] = useState<TypePrevision>('TRIMESTRIELLE');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -125,14 +125,11 @@ export function ImportPrevisionModal({ isOpen, onClose, projetId, onSuccess }: I
     }, 200);
 
     try {
-      // Build ISO date strings: periodeDebut = first day of selected month
       const periodeDebut = `${annee}-${String(mois).padStart(2, '0')}-01`;
-      // periodeFin: calculated based on type (trimestre = +2 months, annuelle = +11 months)
-      const offsetMonths = typePrevision === 'TRIMESTRIELLE' ? 2 : 11;
-      const finDate = new Date(annee, mois - 1 + offsetMonths + 1, 0); // last day of end month
+      const finDate = new Date(annee, mois, 0);
       const periodeFin = `${finDate.getFullYear()}-${String(finDate.getMonth() + 1).padStart(2, '0')}-${String(finDate.getDate()).padStart(2, '0')}`;
 
-      await importerPrevision(projetId, selectedFile, typePrevision, periodeDebut, periodeFin);
+      await importerPrevision(projetId, selectedFile, BACKEND_TYPE_PREVISION, periodeDebut, periodeFin);
       clearInterval(progressInterval);
       setProgress(100);
 
@@ -165,7 +162,6 @@ export function ImportPrevisionModal({ isOpen, onClose, projetId, onSuccess }: I
   const handleClose = () => {
     setSelectedFile(null);
     setFileError('');
-    setTypePrevision('TRIMESTRIELLE');
     setUploading(false);
     setProgress(0);
     onClose();
@@ -180,59 +176,10 @@ export function ImportPrevisionModal({ isOpen, onClose, projetId, onSuccess }: I
 
   return (
     <Modal onClose={handleClose} maxWidth="520px" accentColor={C.purple}>
-      <ModalHeader title="Importer une prévision" subtitle="Fichier Excel de prévision V2" onClose={handleClose} />
+      <ModalHeader title="Importer une prévision mensuelle V2" subtitle="Fichier Excel V2 pour le mois sélectionné" onClose={handleClose} />
       <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <form onSubmit={handleSubmit}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-
-            {/* ── Type de prévision ── */}
-            <div>
-              <p style={lbl}>Type de prévision *</p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                {([
-                  ['TRIMESTRIELLE', 'Trimestrielle', 'Prévision sur 3 mois'],
-                  ['ANNUELLE', 'Annuelle', 'Prévision sur 12 mois'],
-                ] as const).map(([val, label, sub]) => {
-                  const active = typePrevision === val;
-                  return (
-                    <div
-                      key={val}
-                      onClick={() => !uploading && setTypePrevision(val)}
-                      role="radio"
-                      aria-checked={active}
-                      aria-label={label}
-                      tabIndex={0}
-                      onKeyDown={e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); if (!uploading) setTypePrevision(val); } }}
-                      style={{
-                        padding: '12px 14px', borderRadius: R,
-                        border: `2px solid ${active ? C.purple : C.border}`,
-                        backgroundColor: active ? `${C.purple}08` : '#fff',
-                        cursor: uploading ? 'not-allowed' : 'pointer',
-                        transition: 'all 0.15s',
-                        opacity: uploading ? 0.6 : 1,
-                      }}
-                      onMouseEnter={e => { if (!active && !uploading) (e.currentTarget as HTMLDivElement).style.borderColor = `${C.purple}60`; }}
-                      onMouseLeave={e => { if (!active && !uploading) (e.currentTarget as HTMLDivElement).style.borderColor = C.border; }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
-                        <div style={{
-                          width: '14px', height: '14px', borderRadius: '50%',
-                          border: `2px solid ${active ? C.purple : C.border}`,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          transition: 'all 0.15s',
-                        }}>
-                          {active && (
-                            <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: C.purple }} />
-                          )}
-                        </div>
-                        <p style={{ fontSize: '13px', fontWeight: 700, color: active ? C.purple : C.text }}>{label}</p>
-                      </div>
-                      <p style={{ fontSize: '11px', color: C.textMuted, paddingLeft: '22px' }}>{sub}</p>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
 
             {/* ── Période ── */}
             <div>
@@ -245,7 +192,7 @@ export function ImportPrevisionModal({ isOpen, onClose, projetId, onSuccess }: I
                   aria-label="Mois"
                   style={{ flex: 1, padding: '8px 10px', borderRadius: R, border: `1px solid ${C.border}`, fontSize: '12px', fontFamily: 'Inter', color: C.text, backgroundColor: '#fff', cursor: uploading ? 'not-allowed' : 'pointer' }}
                 >
-                  {['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'].map((m, i) => (
+                  {MONTH_LABELS.map((m, i) => (
                     <option key={i} value={i + 1}>{m}</option>
                   ))}
                 </select>
@@ -262,7 +209,7 @@ export function ImportPrevisionModal({ isOpen, onClose, projetId, onSuccess }: I
                 </select>
               </div>
               <p style={{ fontSize: '10px', color: C.textMuted, marginTop: '4px' }}>
-                La période sera calculée automatiquement ({typePrevision === 'TRIMESTRIELLE' ? '3 mois' : '12 mois'} à partir du mois sélectionné)
+                La période importée correspond uniquement au mois sélectionné.
               </p>
             </div>
 
@@ -392,7 +339,7 @@ export function ImportPrevisionModal({ isOpen, onClose, projetId, onSuccess }: I
                   Récapitulatif
                 </p>
                 <p style={{ fontSize: '11px', color: C.textSecondary }}>
-                  Type : {typePrevision === 'TRIMESTRIELLE' ? 'Trimestrielle' : 'Annuelle'} · Mois : {['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'][mois - 1]} {annee} · Fichier : {selectedFile.name}
+                  Prévision mensuelle V2 · Mois : {MONTH_LABELS[mois - 1]} {annee} · Fichier : {selectedFile.name}
                 </p>
               </div>
             )}
@@ -409,7 +356,7 @@ export function ImportPrevisionModal({ isOpen, onClose, projetId, onSuccess }: I
                 {!uploading && progress !== 100 && (
                   <Upload style={{ width: '12px', height: '12px' }} />
                 )}
-                {uploading ? 'Import en cours…' : 'Importer la prévision'}
+                {uploading ? 'Import en cours…' : 'Importer la prévision mensuelle'}
               </BtnPrimary>
               <BtnGhost onClick={handleClose}>Annuler</BtnGhost>
             </div>
