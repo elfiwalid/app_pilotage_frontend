@@ -20,8 +20,8 @@ export type SimulationMode = 'REMPLACEMENT' | 'SOUS_CHARGE';
 
 export interface SimulationState {
   anomalies: AnomalieV2DTO[];
-  conflits: AnomalieV2DTO[];        // CONFLIT | SURCHARGE → for REMPLACEMENT
-  sousCharges: AnomalieV2DTO[];     // SOUS_CHARGE | NON_STAFFE → for SOUS_CHARGE
+  conflits: AnomalieV2DTO[];
+  sousCharges: AnomalieV2DTO[];
   projets: RmProjetDTO[];
   collaborateurs: RmResourceDTO[];
   rmId: number | null;
@@ -30,15 +30,27 @@ export interface SimulationState {
   mois: number;
 }
 
-export type SimulationResult = SimulationRemplacementResponse | SimulationSousChargeResponse;
+export type SimulationResult =
+    | SimulationRemplacementResponse
+    | SimulationSousChargeResponse;
 
 export function useSimulationData() {
   const now = new Date();
+
   const [mode, setMode] = useState<SimulationMode>('REMPLACEMENT');
+
   const [state, setState] = useState<SimulationState>({
-    anomalies: [], conflits: [], sousCharges: [], projets: [], collaborateurs: [],
-    rmId: null, loading: true, annee: now.getFullYear(), mois: now.getMonth() + 1,
+    anomalies: [],
+    conflits: [],
+    sousCharges: [],
+    projets: [],
+    collaborateurs: [],
+    rmId: null,
+    loading: true,
+    annee: now.getFullYear(),
+    mois: now.getMonth() + 1,
   });
+
   const [result, setResult] = useState<SimulationResult | null>(null);
   const [running, setRunning] = useState(false);
   const [validated, setValidated] = useState(false);
@@ -46,6 +58,7 @@ export function useSimulationData() {
 
   const load = async (annee: number, mois: number) => {
     setState(s => ({ ...s, loading: true, annee, mois }));
+
     try {
       const [anomalies, projets, collaborateurs, profile] = await Promise.all([
         fetchAnomaliesV2(annee, mois),
@@ -53,43 +66,75 @@ export function useSimulationData() {
         fetchRmResources(annee, mois),
         fetchMyProfile(),
       ]);
+
       const conflits = anomalies.filter(a =>
-        a.typeAnomalie === 'CONFLIT' || a.typeAnomalie === 'SURCHARGE'
+          a.typeAnomalie === 'CONFLIT' || a.typeAnomalie === 'SURCHARGE'
       );
+
       const sousCharges = anomalies.filter(a =>
-        a.typeAnomalie === 'SOUS_CHARGE' || a.typeAnomalie === 'NON_STAFFE'
+          a.typeAnomalie === 'SOUS_CHARGE' || a.typeAnomalie === 'NON_STAFFE'
       );
+
       setState(s => ({
-        ...s, anomalies, conflits, sousCharges, projets, collaborateurs,
-        rmId: profile.id, loading: false,
+        ...s,
+        anomalies,
+        conflits,
+        sousCharges,
+        projets,
+        collaborateurs,
+        rmId: profile.id,
+        loading: false,
       }));
     } catch {
       setState(s => ({ ...s, loading: false }));
     }
   };
 
-  useEffect(() => { load(state.annee, state.mois); }, []);
+  useEffect(() => {
+    load(state.annee, state.mois);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const setPeriod = (annee: number, mois: number) => load(annee, mois);
+  const setPeriod = (annee: number, mois: number) => {
+    load(annee, mois);
+  };
 
-  const runRemplacementSimulation = async (req: SimulationRemplacementRequest) => {
-    setRunning(true); setResult(null); setValidated(false); setError(null);
+  const runRemplacementSimulation = async (
+      req: SimulationRemplacementRequest
+  ) => {
+    setRunning(true);
+    setResult(null);
+    setValidated(false);
+    setError(null);
+
     try {
       const res = await simulerRemplacement(req);
       setResult(res);
     } catch (e: any) {
       setError(e.message || 'Erreur lors de la simulation');
-    } finally { setRunning(false); }
+      throw e;
+    } finally {
+      setRunning(false);
+    }
   };
 
-  const runSousChargeSimulation = async (req: SimulationSousChargeRequest) => {
-    setRunning(true); setResult(null); setValidated(false); setError(null);
+  const runSousChargeSimulation = async (
+      req: SimulationSousChargeRequest
+  ) => {
+    setRunning(true);
+    setResult(null);
+    setValidated(false);
+    setError(null);
+
     try {
       const res = await simulerSousCharge(req);
       setResult(res);
     } catch (e: any) {
       setError(e.message || 'Erreur lors de la simulation');
-    } finally { setRunning(false); }
+      throw e;
+    } finally {
+      setRunning(false);
+    }
   };
 
   const runConflitSimulation = async (req: SimulationDepuisConflitRequest) => {
@@ -110,6 +155,7 @@ export function useSimulationData() {
       load(state.annee, state.mois);
     } catch (e: any) {
       setError(e.message || 'Erreur lors de la validation');
+      throw e;
     }
   };
 
@@ -119,10 +165,15 @@ export function useSimulationData() {
       setResult(null);
     } catch (e: any) {
       setError(e.message || "Erreur lors de l'annulation");
+      throw e;
     }
   };
 
-  const reset = () => { setResult(null); setValidated(false); setError(null); };
+  const reset = () => {
+    setResult(null);
+    setValidated(false);
+    setError(null);
+  };
 
   const switchMode = (newMode: SimulationMode) => {
     setMode(newMode);
@@ -130,12 +181,19 @@ export function useSimulationData() {
   };
 
   return {
-    mode, switchMode,
-    state, result, running, validated, error,
+    mode,
+    switchMode,
+    state,
+    result,
+    running,
+    validated,
+    error,
     setPeriod,
     runRemplacementSimulation,
     runConflitSimulation,
     runSousChargeSimulation,
-    validate, cancel, reset,
+    validate,
+    cancel,
+    reset,
   };
 }

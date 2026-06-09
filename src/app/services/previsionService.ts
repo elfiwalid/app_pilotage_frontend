@@ -5,7 +5,7 @@
  *   This module handles only prevision-related API interactions.
  */
 
-import { apiGet, getToken } from './api';
+import { apiDelete, apiGet, getToken } from './api';
 
 /* ─── Response DTOs ───────────────────────────── */
 
@@ -190,4 +190,8 @@ export async function telechargerPrevision(previsionId: number): Promise<void> {
  */
 export function getStatistiques(previsionId: number): Promise<PrevisionStatsDTO> {
   return apiGet<PrevisionStatsDTO>(`/previsions/${previsionId}/stats`);
+}
+
+export function supprimerPrevision(previsionId: number): Promise<void> {
+  return apiDelete<void>(`/previsions/${previsionId}`);
 }
