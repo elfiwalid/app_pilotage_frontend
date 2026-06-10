@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
+import { fetchMyProfile } from '../services/userService';
 
 export type Role = 'rm' | 'pm' | 'collab';
 
@@ -12,6 +13,7 @@ export interface UserProfile {
   roleLabel: string;
   accent: string;
   avatarGradient: string;
+  photoUrl?: string | null;
 }
 
 /**
@@ -56,10 +58,10 @@ interface RoleContextType {
   role: Role;
   setRole: (role: Role) => void;
   profile: UserProfile;
-  setProfileFromUser: (user: { name: string; email: string; initials: string; role: Role }) => void;
+  setProfileFromUser: (user: { name: string; email: string; initials: string; role: Role; photoUrl?: string | null }) => void;
 }
 
-function buildProfile(role: Role, name = '', email = '', initials = ''): UserProfile {
+function buildProfile(role: Role, name = '', email = '', initials = '', photoUrl?: string | null): UserProfile {
   const defaults = ROLE_DEFAULTS[role];
   const shortName = name.length > 18 ? name.slice(0, 16) + '…' : name;
   return {
@@ -71,6 +73,7 @@ function buildProfile(role: Role, name = '', email = '', initials = ''): UserPro
     roleLabel: defaults.roleLabel,
     accent: defaults.accent,
     avatarGradient: defaults.avatarGradient,
+    photoUrl,
   };
 }
 
@@ -93,7 +96,14 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (user) {
       setRoleState(user.role);
-      setProfile(buildProfile(user.role, user.name, user.email, user.initials));
+      setProfile(buildProfile(user.role, user.name, user.email, user.initials, user.photoUrl));
+      fetchMyProfile()
+        .then(profileData => {
+          const name = `${profileData.prenom} ${profileData.nom}`;
+          const initials = `${profileData.prenom.charAt(0)}${profileData.nom.charAt(0)}`.toUpperCase();
+          setProfile(buildProfile(user.role, name, profileData.email, initials, profileData.photoUrl));
+        })
+        .catch(() => {});
     } else {
       // Pas d'utilisateur connecté : reset au profil par défaut
       setRoleState('rm');
@@ -101,14 +111,26 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     }
   }, [user]);
 
+  useEffect(() => {
+    const handleProfileUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ name: string; email: string; initials: string; role: Role; photoUrl?: string | null }>).detail;
+      if (!detail) return;
+      setRoleState(detail.role);
+      setProfile(buildProfile(detail.role, detail.name, detail.email, detail.initials, detail.photoUrl));
+    };
+
+    window.addEventListener('s2s_profile_updated', handleProfileUpdated);
+    return () => window.removeEventListener('s2s_profile_updated', handleProfileUpdated);
+  }, []);
+
   const setRole = (newRole: Role) => {
     setRoleState(newRole);
-    setProfile(prev => buildProfile(newRole, prev.name, prev.email, prev.initials));
+    setProfile(prev => buildProfile(newRole, prev.name, prev.email, prev.initials, prev.photoUrl));
   };
 
-  const setProfileFromUser = (user: { name: string; email: string; initials: string; role: Role }) => {
+  const setProfileFromUser = (user: { name: string; email: string; initials: string; role: Role; photoUrl?: string | null }) => {
     setRoleState(user.role);
-    setProfile(buildProfile(user.role, user.name, user.email, user.initials));
+    setProfile(buildProfile(user.role, user.name, user.email, user.initials, user.photoUrl));
   };
 
   return (

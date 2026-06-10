@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate } from 'react-router';
 import { MainLayout } from './components/layout/MainLayout';
 import { Login } from './pages/Login';
+import { Documentation } from './pages/Documentation';
 
 // RM Pages
 import { Dashboard as RmDashboard } from './pages/Dashboard';
@@ -45,6 +46,8 @@ export const router = createBrowserRouter(
         { path: 'settings', Component: Settings },
         { path: 'rm/profile', Component: RmProfile },
         { path: 'rm/notifications', Component: RmNotifications },
+        { path: 'documentation', Component: Documentation },
+        { path: 'guide', element: <Navigate to="/documentation" replace /> },
 
         // Project Manager
         { path: 'pm', Component: PmDashboard },

@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from './api';
+import { apiGet, apiPost, apiFetch } from './api';
 
 export interface ProjetAffecteDTO {
   projetId: number;
@@ -132,7 +132,7 @@ export function proposerAlternative(anomalieId: number, collaborateurId: number,
 
 export async function exportV2Consolide(projetIds: number[]): Promise<void> {
   const token = localStorage.getItem('s2s_token');
-  const response = await fetch('/api/rm/export-v2', {
+  const response = await apiFetch('/rm/export-v2', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
