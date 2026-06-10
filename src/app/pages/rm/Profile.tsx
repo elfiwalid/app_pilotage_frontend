@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { Mail, Phone, MapPin, Shield, Edit3, Save, Camera, Activity, CheckCircle, Calendar, RefreshCcw, Loader2 } from 'lucide-react';
+import { Mail, Phone, MapPin, Shield, Edit3, Save, Activity, CheckCircle, Calendar, RefreshCcw, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router';
 import { C, R, PageHeader, SectionCard, BtnPrimary, BtnGhost, cardStyle } from '../../components/ui/design-system';
 import { useRole, PROFILES, ROLE_DASHBOARDS, type Role } from '../../context/RoleContext';
 import { fetchMyProfile, updateMyProfile, type UserResponseDTO } from '../../services/userService';
+import { ProfilePhoto } from '../../components/profile/ProfilePhoto';
 
 const activities = [
   { date: '10/04/2026', action: 'Conflit résolu — Youssef El Amrani surcharge 180%', icon: CheckCircle, color: C.green },
@@ -104,6 +105,17 @@ export function RmProfile() {
     event.target.value = '';
   };
 
+  const handleDeletePhoto = async () => {
+    if (!profile) return;
+    try {
+      const updated = await updateMyProfile({ nom, prenom, email, poste, photoUrl: null });
+      setProfile(updated);
+      toast.success('Photo de profil supprimée.');
+    } catch (err: any) {
+      toast.error(err.message || 'Impossible de supprimer la photo.');
+    }
+  };
+
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '7px 10px', fontSize: '12px',
     border: `1px solid ${C.border}`, borderRadius: R,
@@ -144,15 +156,16 @@ export function RmProfile() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {/* Avatar card */}
           <div style={{ ...cardStyle, borderTop: `3px solid ${C.magenta}`, padding: '20px', textAlign: 'center' }}>
-            <div style={{ position: 'relative', display: 'inline-block', marginBottom: '14px' }}>
-              <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: 'linear-gradient(135deg, #7B2CBF 0%, #E600A9 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '24px', fontWeight: 800, margin: '0 auto', overflow: 'hidden' }}>
-                {profile.photoUrl ? <img src={profile.photoUrl} alt={fullName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
-              </div>
-              <input ref={photoInputRef} type="file" accept="image/*" onChange={handlePhotoChange} style={{ display: 'none' }} />
-              <button onClick={() => photoInputRef.current?.click()} style={{ position: 'absolute', bottom: 0, right: 0, width: '22px', height: '22px', borderRadius: '50%', backgroundColor: C.magenta, border: '2px solid white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Camera style={{ width: '11px', height: '11px', color: '#fff' }} />
-              </button>
-            </div>
+            <ProfilePhoto
+              photoUrl={profile.photoUrl}
+              fullName={fullName}
+              initials={initials}
+              accent={C.magenta}
+              gradient="linear-gradient(135deg, #7B2CBF 0%, #E600A9 100%)"
+              inputRef={photoInputRef}
+              onPhotoChange={handlePhotoChange}
+              onDeletePhoto={handleDeletePhoto}
+            />
             <p style={{ fontSize: '15px', fontWeight: 800, color: C.text, marginBottom: '3px' }}>{fullName}</p>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '3px 10px', borderRadius: R, backgroundColor: `${C.magenta}14`, border: `1px solid ${C.magenta}30`, marginBottom: '16px' }}>
               <Shield style={{ width: '11px', height: '11px', color: C.magenta }} />

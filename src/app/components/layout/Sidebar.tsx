@@ -6,7 +6,7 @@ import {
   Calendar, Bell, UserCircle, Upload, MessageSquare,
 } from 'lucide-react';
 import { C, R } from '../ui/design-system';
-import { useRole, ROLE_DASHBOARDS, type Role } from '../../context/RoleContext';
+import { useRole, type Role } from '../../context/RoleContext';
 import logo from '../../../imports/Logo_moderne_de_Staff2Staff_en_hexagone.png';
 import { fetchAnomalies } from '../../services/anomalieService';
 import { fetchMesNotifications } from '../../services/notificationService';
@@ -15,6 +15,7 @@ const ROLE_ACCENT: Record<Role, string> = { rm: '#E600A9', pm: '#2D9CDB', collab
 
 export function Sidebar() {
   const { role } = useRole();
+  const navigate = useNavigate();
   const location = useLocation();
   const accent = ROLE_ACCENT[role];
   const [counts, setCounts] = useState({ anomalies: 0, notifications: 0 });
@@ -23,7 +24,11 @@ export function Sidebar() {
     loadCounts();
     // Refresh counts every 30s
     const interval = setInterval(loadCounts, 30000);
-    return () => clearInterval(interval);
+    window.addEventListener('s2s:notifications-changed', loadCounts);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('s2s:notifications-changed', loadCounts);
+    };
   }, [role]);
 
   async function loadCounts() {
@@ -106,7 +111,7 @@ export function Sidebar() {
   };
 
   return (
-    <aside style={{
+    <aside className="s2s-sidebar" style={{
       width: '224px', backgroundColor: C.sidebar,
       display: 'flex', flexDirection: 'column',
       flexShrink: 0, height: '100vh',
@@ -119,7 +124,7 @@ export function Sidebar() {
         <div style={{ width: '30px', height: '30px', borderRadius: R, overflow: 'hidden', flexShrink: 0, backgroundColor: 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <img src={logo} alt="Staff2Staff" style={{ width: '26px', height: '26px', objectFit: 'contain' }} />
         </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="s2s-sidebar-brand" style={{ flex: 1, minWidth: 0 }}>
           <p style={{ color: '#fff', fontWeight: 800, fontSize: '14px', lineHeight: 1, letterSpacing: '-0.02em' }}>Staff2Staff</p>
           <p style={{ color: 'rgba(255,255,255,0.28)', fontSize: '9px', marginTop: '3px', lineHeight: 1 }}>Sopra Banking Software</p>
         </div>
@@ -129,7 +134,7 @@ export function Sidebar() {
       <nav style={{ flex: 1, padding: '6px 8px', overflowY: 'auto' }}>
         {NAV[role].map((group) => (
           <div key={group.label} style={{ marginBottom: '2px' }}>
-            <p style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.22)', padding: '8px 10px 4px' }}>
+            <p className="s2s-sidebar-group-label" style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.22)', padding: '8px 10px 4px' }}>
               {group.label}
             </p>
             {group.items.map((item) => {
@@ -152,7 +157,7 @@ export function Sidebar() {
                   onMouseLeave={e => { if (!active) { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.48)'; } }}
                 >
                   <item.icon style={{ width: '14px', height: '14px', color: active ? accent : 'inherit', flexShrink: 0 }} />
-                  <span style={{ fontSize: '12px', fontWeight: active ? 600 : 400, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</span>
+                  <span className="s2s-sidebar-item-label" style={{ fontSize: '12px', fontWeight: active ? 600 : 400, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</span>
                   {item.badge && item.badge > 0 ? (
                     <span style={{ backgroundColor: accent, color: '#fff', fontSize: '9px', fontWeight: 800, padding: '1px 5px', borderRadius: '10px', lineHeight: '15px', minWidth: '16px', textAlign: 'center' }}>
                       {item.badge}
@@ -167,7 +172,7 @@ export function Sidebar() {
 
       {/* Bottom help */}
       <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.06)', margin: '0 10px' }} />
-      <div style={{ padding: '10px 8px 14px' }}>
+      <div className="s2s-sidebar-help" style={{ padding: '10px 8px 14px' }}>
         <div style={{ backgroundColor: `${accent}18`, border: `1px solid ${accent}25`, borderRadius: R, padding: '10px 12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '5px' }}>
             <BookOpen style={{ width: '12px', height: '12px', color: accent }} />
@@ -175,6 +180,7 @@ export function Sidebar() {
           </div>
           <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)', marginBottom: '8px', lineHeight: 1.4 }}>Guide Staff2Staff v2.0</p>
           <button
+            onClick={() => navigate('/documentation')}
             style={{ width: '100%', backgroundColor: '#7B2CBF', color: '#fff', border: 'none', borderRadius: R, padding: '5px 10px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}
             onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#6A1FA8')}
             onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#7B2CBF')}

@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
-import { Mail, Phone, MapPin, Briefcase, Edit3, Save, Camera, Star, Loader2, Send, ChevronDown, MessageSquare } from 'lucide-react';
+import { Mail, Phone, MapPin, Briefcase, Edit3, Save, Star, Loader2, Send, ChevronDown, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
 import { C, R, PageHeader, SectionCard, BtnPrimary, BtnGhost, cardStyle } from '../../components/ui/design-system';
 import { fetchMyProfile, updateMyProfile, fetchUsers, type UserResponseDTO } from '../../services/userService';
 import { submitEvaluation, fetchEvaluationsParChef, type EvaluationResponse } from '../../services/evaluationService';
+import { ProfilePhoto } from '../../components/profile/ProfilePhoto';
 
 const MOIS_LABELS: Record<number, string> = {
   1: 'Janvier', 2: 'Février', 3: 'Mars', 4: 'Avril', 5: 'Mai', 6: 'Juin',
@@ -127,6 +128,17 @@ export function PmProfile() {
     event.target.value = '';
   };
 
+  const handleDeletePhoto = async () => {
+    if (!profile) return;
+    try {
+      const updated = await updateMyProfile({ nom, prenom, email, poste, photoUrl: null });
+      setProfile(updated);
+      toast.success('Photo de profil supprimée.');
+    } catch (err: any) {
+      toast.error(err.message || 'Impossible de supprimer la photo.');
+    }
+  };
+
   const handleSubmitEvaluation = async () => {
     if (!evalCollabId) { toast.error('Veuillez sélectionner un collaborateur'); return; }
     if (evalQualite === 0 || evalDelais === 0 || evalEquipe === 0 || evalComm === 0) {
@@ -209,15 +221,16 @@ export function PmProfile() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <div style={{ ...cardStyle, borderTop: `3px solid ${C.blue}`, padding: '20px', textAlign: 'center' }}>
             {/* Avatar */}
-            <div style={{ position: 'relative', display: 'inline-block', marginBottom: '14px' }}>
-              <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: 'linear-gradient(135deg, #1E40AF 0%, #2D9CDB 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '24px', fontWeight: 800, margin: '0 auto', overflow: 'hidden' }}>
-                {profile.photoUrl ? <img src={profile.photoUrl} alt={fullName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
-              </div>
-              <input ref={photoInputRef} type="file" accept="image/*" onChange={handlePhotoChange} style={{ display: 'none' }} />
-              <button onClick={() => photoInputRef.current?.click()} style={{ position: 'absolute', bottom: 0, right: 0, width: '22px', height: '22px', borderRadius: '50%', backgroundColor: C.blue, border: '2px solid white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Camera style={{ width: '11px', height: '11px', color: '#fff' }} />
-              </button>
-            </div>
+            <ProfilePhoto
+              photoUrl={profile.photoUrl}
+              fullName={fullName}
+              initials={initials}
+              accent={C.blue}
+              gradient="linear-gradient(135deg, #1E40AF 0%, #2D9CDB 100%)"
+              inputRef={photoInputRef}
+              onPhotoChange={handlePhotoChange}
+              onDeletePhoto={handleDeletePhoto}
+            />
 
             <p style={{ fontSize: '16px', fontWeight: 800, color: C.text, marginBottom: '2px' }}>{fullName}</p>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '3px 10px', borderRadius: R, backgroundColor: `${C.blue}14`, border: `1px solid ${C.blue}30`, marginBottom: '16px' }}>

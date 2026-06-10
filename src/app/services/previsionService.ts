@@ -5,7 +5,7 @@
  *   This module handles only prevision-related API interactions.
  */
 
-import { apiDelete, apiGet, getToken } from './api';
+import { apiDelete, apiGet, getToken, apiFetch } from './api';
 
 /* ─── Response DTOs ───────────────────────────── */
 
@@ -30,8 +30,6 @@ export interface PrevisionStatsDTO {
 }
 
 /* ─── API Base URL ────────────────────────────── */
-
-const API_BASE_URL = '/api';
 
 /* ─── Service Functions ───────────────────────── */
 
@@ -59,8 +57,8 @@ export async function importerPrevision(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(
-    `${API_BASE_URL}/projets/${projetId}/previsions`,
+  const response = await apiFetch(
+    `/projets/${projetId}/previsions`,
     {
       method: 'POST',
       headers,
@@ -104,8 +102,8 @@ export async function getPrevisionActive(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(
-    `${API_BASE_URL}/projets/${projetId}/previsions/active`,
+  const response = await apiFetch(
+    `/projets/${projetId}/previsions/active`,
     {
       method: 'GET',
       headers,
@@ -142,8 +140,8 @@ export async function telechargerPrevision(previsionId: number): Promise<void> {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(
-    `${API_BASE_URL}/previsions/${previsionId}/download`,
+  const response = await apiFetch(
+    `/previsions/${previsionId}/download`,
     {
       method: 'GET',
       headers,

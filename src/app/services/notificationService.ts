@@ -18,14 +18,21 @@ export function fetchNombreNonLues(): Promise<{ nonLues: number }> {
   return apiGet<{ nonLues: number }>('/notifications/count');
 }
 
-export function marquerCommeLue(id: number): Promise<void> {
-  return apiPut<void>(`/notifications/${id}/lu`, {});
+function notifyNotificationsChanged(): void {
+  window.dispatchEvent(new Event('s2s:notifications-changed'));
 }
 
-export function marquerToutesCommeLues(): Promise<void> {
-  return apiPut<void>('/notifications/lu-toutes', {});
+export async function marquerCommeLue(id: number): Promise<void> {
+  await apiPut<void>(`/notifications/${id}/lu`, {});
+  notifyNotificationsChanged();
 }
 
-export function supprimerNotification(id: number): Promise<void> {
-  return apiDelete<void>(`/notifications/${id}`);
+export async function marquerToutesCommeLues(): Promise<void> {
+  await apiPut<void>('/notifications/lu-toutes', {});
+  notifyNotificationsChanged();
+}
+
+export async function supprimerNotification(id: number): Promise<void> {
+  await apiDelete<void>(`/notifications/${id}`);
+  notifyNotificationsChanged();
 }

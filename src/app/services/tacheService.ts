@@ -1,6 +1,4 @@
-import { getToken } from './api';
-
-const API_BASE_URL = '/api';
+import { getToken, apiFetch } from './api';
 
 export interface TacheCollaborateurDTO {
   id: number;
@@ -34,7 +32,7 @@ export async function importerTachesProjet(
   const headers: Record<string, string> = {};
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const response = await fetch(`${API_BASE_URL}/projets/${projetId}/taches/import`, {
+  const response = await apiFetch(`/projets/${projetId}/taches/import`, {
     method: 'POST',
     headers,
     body: formData,

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Briefcase, Users, AlertTriangle, TrendingUp, ArrowUpRight, BarChart2, DollarSign, Activity, Calendar, RefreshCw } from 'lucide-react';
+import { Briefcase, Users, AlertTriangle, TrendingUp, ArrowUpRight, Activity, Calendar, RefreshCw, Sparkles } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
 import { C, S, R, PageHeader, SectionCard, KpiCard, cardStyle } from '../../components/ui/design-system';
 import { useNavigate } from 'react-router';
@@ -11,6 +11,8 @@ import {
   MoisAnomalieDTO,
   MoisCollabDTO,
 } from '../../services/pmDashboardService';
+import { fetchResourceForecast, ResourceForecastResponse } from '../../services/mlForecastService';
+import { fetchPmRapportsV2, PmRapportMensuelDTO } from '../../services/pmReportsService';
 
 /* ─── CONSTANTS ────────────────────────────────────── */
 const MOIS_OPTIONS = [
@@ -54,12 +56,41 @@ const STATUS_CFG: Record<string, { bg: string; text: string; dot: string; label:
   SUSPENDU: { bg: '#F5F3FF', text: '#6D28D9', dot: '#8B5CF6', label: 'Suspendu' },
 };
 
+const ML_RISK_CFG: Record<ResourceForecastResponse['riskLevel'], { label: string; bg: string; text: string; dot: string }> = {
+  LOW: { label: 'Faible', bg: '#ECFDF5', text: '#065F46', dot: C.green },
+  MEDIUM: { label: 'Modéré', bg: '#FFFBEB', text: '#92400E', dot: '#F59E0B' },
+  HIGH: { label: 'Élevé', bg: '#FEF2F2', text: '#B91C1C', dot: C.red },
+};
+
 /* ─── SELECT STYLE ─────────────────────────────────── */
 const selectStyle: React.CSSProperties = {
   fontSize: '12px', fontWeight: 600, color: C.text,
   border: `1px solid ${C.border}`, borderRadius: R,
   padding: '5px 8px', backgroundColor: C.white,
   cursor: 'pointer', outline: 'none',
+};
+
+const ALL_FORECAST_PROJECTS = '__ALL_PROJECTS__';
+
+const normalizeProjectName = (value: string) => value.toLowerCase().trim();
+
+const average = (values: number[], fallback: number) => (
+  values.length > 0 ? values.reduce((sum, value) => sum + value, 0) / values.length : fallback
+);
+
+const projectMatches = (source: string, selected: string) => {
+  const normalizedSource = normalizeProjectName(source);
+  const normalizedSelected = normalizeProjectName(selected);
+  return normalizedSource === normalizedSelected
+    || normalizedSource.includes(normalizedSelected)
+    || normalizedSelected.includes(normalizedSource);
+};
+
+const getProjectDurationDays = (dateDebut: string, dateFin: string) => {
+  const start = new Date(dateDebut).getTime();
+  const end = new Date(dateFin).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return null;
+  return Math.ceil((end - start) / 86400000);
 };
 
 /* ─── COMPONENT ────────────────────────────────────── */
@@ -73,6 +104,12 @@ export function PmDashboard() {
 
   /* ── Data ── */
   const [data, setData] = useState<DashboardChefProjetDTO | null>(null);
+  const [reportsV2, setReportsV2] = useState<PmRapportMensuelDTO[]>([]);
+  const [selectedForecastProject, setSelectedForecastProject] = useState(ALL_FORECAST_PROJECTS);
+  const [forecastSourceLabel, setForecastSourceLabel] = useState<string | null>(null);
+  const [forecast, setForecast] = useState<ResourceForecastResponse | null>(null);
+  const [forecastLoading, setForecastLoading] = useState(false);
+  const [forecastError, setForecastError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
 
@@ -80,8 +117,12 @@ export function PmDashboard() {
     setLoading(true);
     setError(null);
     try {
-      const d = await fetchPmDashboard(selAnnee, selMois);
+      const [d, reports] = await Promise.all([
+        fetchPmDashboard(selAnnee, selMois),
+        fetchPmRapportsV2().catch(() => [] as PmRapportMensuelDTO[]),
+      ]);
       setData(d);
+      setReportsV2(reports);
     } catch (e: any) {
       setError(e.message || 'Erreur de chargement');
     } finally {
@@ -90,6 +131,99 @@ export function PmDashboard() {
   };
 
   useEffect(() => { loadData(); }, [selAnnee, selMois]);
+
+  const forecastProjectOptions = Array.from(
+    new Set(reportsV2.flatMap(report => report.projetsConcernes).map(project => project.trim()).filter(Boolean))
+  ).sort((a, b) => a.localeCompare(b, 'fr'));
+
+  useEffect(() => {
+    if (selectedForecastProject !== ALL_FORECAST_PROJECTS && !forecastProjectOptions.includes(selectedForecastProject)) {
+      setSelectedForecastProject(ALL_FORECAST_PROJECTS);
+    }
+  }, [reportsV2, selectedForecastProject]);
+
+  useEffect(() => {
+    if (!data) {
+      setForecast(null);
+      setForecastSourceLabel(null);
+      return;
+    }
+
+    const selectedPeriodLabel = `${MOIS_OPTIONS.find(m => m.value === selMois)?.label || `Mois ${selMois}`} ${selAnnee}`;
+    const isAllProjects = selectedForecastProject === ALL_FORECAST_PROJECTS;
+    const selectedScopeLabel = isAllProjects ? 'Tous les projets' : selectedForecastProject;
+    const report = reportsV2.find(r => r.annee === selAnnee && r.mois === selMois);
+
+    if (!report) {
+      setForecast(null);
+      setForecastSourceLabel(`${selectedPeriodLabel} — ${selectedScopeLabel}`);
+      setForecastError(`Aucune donnée V2 pour ${selectedPeriodLabel}`);
+      setForecastLoading(false);
+      return;
+    }
+
+    const scopedAnomalies = isAllProjects
+      ? report.anomalies
+      : report.anomalies.filter(anomaly => projectMatches(anomaly.projetsConcernes || '', selectedForecastProject));
+    const scopedProjects = isAllProjects
+      ? report.projetsConcernes
+      : report.projetsConcernes.filter(project => projectMatches(project, selectedForecastProject));
+    const collaboratorCount = isAllProjects
+      ? report.nombreCollaborateursConcernes
+      : new Set(scopedAnomalies.map(anomaly => anomaly.collaborateur).filter(Boolean)).size;
+    const nbConflits = isAllProjects ? report.nombreConflits : scopedAnomalies.filter(anomaly => anomaly.typeAnomalie === 'CONFLIT').length;
+    const nbSurcharges = isAllProjects ? report.nombreSurcharges : scopedAnomalies.filter(anomaly => anomaly.typeAnomalie === 'SURCHARGE').length;
+    const nbSousCharges = isAllProjects ? report.nombreSousCharges : scopedAnomalies.filter(anomaly => anomaly.typeAnomalie === 'SOUS_CHARGE').length;
+    const nbAnomaliesTotal = isAllProjects ? report.nombreTotalAnomalies : scopedAnomalies.length;
+
+    if (collaboratorCount === 0 && nbAnomaliesTotal === 0) {
+      setForecast(null);
+      setForecastSourceLabel(`${report.libellePeriode} — ${selectedScopeLabel}`);
+      setForecastError(isAllProjects ? 'Données V2 insuffisantes pour la période sélectionnée' : 'Données V2 insuffisantes pour ce projet sur la période sélectionnée');
+      setForecastLoading(false);
+      return;
+    }
+
+    const durationProjectNames = scopedProjects.length > 0 ? scopedProjects : report.projetsConcernes;
+    const matchingProjects = data.performanceProjets.filter(project =>
+      durationProjectNames.some(reportProject => projectMatches(project.nom, reportProject))
+    );
+    const durationSource = matchingProjects.length > 0 ? matchingProjects : data.performanceProjets;
+    const avgDuration = Math.round(average(
+      durationSource.map(project => getProjectDurationDays(project.dateDebut, project.dateFin)).filter((duration): duration is number => duration != null),
+      180
+    ));
+    const realisticDuration = avgDuration > 0 ? avgDuration : 180;
+    const anomalyRates = scopedAnomalies.map(anomaly => anomaly.tauxCharge).filter(value => Number.isFinite(value) && value > 0);
+    const chargeMoyenne = isAllProjects && report.allocationMoyenne != null
+      ? report.allocationMoyenne
+      : average(anomalyRates, nbAnomaliesTotal > 0 ? 100 : 85);
+    const chargeMax = anomalyRates.length > 0 ? Math.max(...anomalyRates, chargeMoyenne) : chargeMoyenne;
+    const contextLabel = `${report.libellePeriode} — ${selectedScopeLabel}`;
+
+    setForecastLoading(true);
+    setForecastError(null);
+    setForecastSourceLabel(contextLabel);
+    fetchResourceForecast({
+      mois: report.mois,
+      annee: report.annee,
+      dureeProjetJours: realisticDuration,
+      nbCollaborateursActuels: collaboratorCount,
+      chargeMoyenne: Math.round(chargeMoyenne * 100) / 100,
+      chargeMax: Math.round(chargeMax * 100) / 100,
+      nbConflits,
+      nbSurcharges,
+      nbSousCharges,
+      nbAnomaliesTotal,
+      nbCollaborateursConcernes: collaboratorCount,
+    })
+      .then(setForecast)
+      .catch(e => {
+        setForecast(null);
+        setForecastError(e.message || 'Prévision indisponible');
+      })
+      .finally(() => setForecastLoading(false));
+  }, [data, reportsV2, selAnnee, selMois, selectedForecastProject]);
 
   /* ── Derived helpers ── */
   const moisLabel = MOIS_OPTIONS.find(m => m.value === selMois)?.label || '';
@@ -164,6 +298,67 @@ export function PmDashboard() {
           : kpiData.map(k => <KpiCard key={k.title} label={k.title} value={k.value} sub={k.sub} trend={k.change} trendPositive={k.trendPositive} icon={k.icon} accent={k.accent} />)
         }
       </div>
+
+      <SectionCard
+        title="Prévision IA"
+        subtitle={forecastSourceLabel ? `Estimation basée sur ${forecastSourceLabel}` : 'Estimation basée sur les rapports V2'}
+        accent="#14B8A6"
+        actions={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            <select
+              value={selectedForecastProject}
+              onChange={event => setSelectedForecastProject(event.target.value)}
+              style={{ ...selectStyle, maxWidth: '220px' }}
+            >
+              <option value={ALL_FORECAST_PROJECTS}>Tous les projets</option>
+              {forecastProjectOptions.map(project => <option key={project} value={project}>{project}</option>)}
+            </select>
+            {forecast && (
+              <span style={{ fontSize: '11px', fontWeight: 700, color: ML_RISK_CFG[forecast.riskLevel].text, backgroundColor: ML_RISK_CFG[forecast.riskLevel].bg, border: `1px solid ${ML_RISK_CFG[forecast.riskLevel].dot}30`, padding: '2px 8px', borderRadius: R, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: ML_RISK_CFG[forecast.riskLevel].dot }} />
+                Risque {ML_RISK_CFG[forecast.riskLevel].label}
+              </span>
+            )}
+          </div>
+        }
+      >
+        <p style={{ fontSize: '12px', color: C.textMuted, fontWeight: 600, marginBottom: '12px' }}>
+          Prédiction calculée à partir des collaborateurs concernés et des anomalies V2 du mois sélectionné, selon le périmètre projet choisi.
+        </p>
+        {forecastLoading ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '12px' }}>
+            {[1,2,3,4].map(i => <div key={i} style={{ height: 58, backgroundColor: C.borderLight, borderRadius: R }} />)}
+          </div>
+        ) : forecastError ? (
+          <div style={{ padding: '12px', borderRadius: R, backgroundColor: '#FFFBEB', color: '#92400E', fontSize: '12px', fontWeight: 600 }}>
+            {forecastError}
+          </div>
+        ) : forecast ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '12px' }}>
+            {[
+              { label: 'Collaborateurs concernés', value: forecast.currentResources, sub: 'rapport V2 du mois', color: C.blue },
+              { label: 'Besoin estimé mois prochain', value: forecast.predictedResources, sub: 'prévision IA', color: '#14B8A6' },
+              { label: 'Variation estimée', value: `${forecast.difference >= 0 ? '+' : ''}${forecast.difference}`, sub: forecast.difference >= 0 ? 'ressources à anticiper' : 'marge estimée', color: forecast.difference > 0 ? C.red : C.green },
+              { label: 'Niveau de risque', value: ML_RISK_CFG[forecast.riskLevel].label, sub: 'modèle ML', color: ML_RISK_CFG[forecast.riskLevel].dot },
+            ].map(item => (
+              <div key={item.label} style={{ padding: '12px', borderRadius: R, border: `1px solid ${C.border}`, backgroundColor: C.white, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '34px', height: '34px', borderRadius: R, backgroundColor: `${item.color}14`, color: item.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Sparkles style={{ width: '17px', height: '17px' }} />
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <p style={{ fontSize: '11px', color: C.textMuted, fontWeight: 600 }}>{item.label}</p>
+                  <p style={{ fontSize: '20px', color: C.text, fontWeight: 800, lineHeight: 1.1 }}>{item.value}</p>
+                  <p style={{ fontSize: '10px', color: item.color, fontWeight: 700 }}>{item.sub}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ padding: '12px', borderRadius: R, backgroundColor: C.bg, color: C.textMuted, fontSize: '12px', fontWeight: 600 }}>
+            Aucune donnée suffisante pour calculer une prévision IA.
+          </div>
+        )}
+      </SectionCard>
 
       {/* Charts Row 1 */}
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>

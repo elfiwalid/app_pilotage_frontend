@@ -37,5 +37,26 @@ export function updateMyProfile(data: {
   poste: string;
   photoUrl?: string | null;
 }): Promise<UserResponseDTO> {
-  return apiPut<UserResponseDTO>('/users/me', data);
+  return apiPut<UserResponseDTO>('/users/me', data).then(updated => {
+    const stored = localStorage.getItem('s2s_user');
+    if (stored) {
+      try {
+        const currentUser = JSON.parse(stored);
+        const nextUser = {
+          ...currentUser,
+          nom: updated.nom,
+          prenom: updated.prenom,
+          email: updated.email,
+          name: `${updated.prenom} ${updated.nom}`,
+          initials: `${updated.prenom.charAt(0)}${updated.nom.charAt(0)}`.toUpperCase(),
+          photoUrl: updated.photoUrl ?? null,
+        };
+        localStorage.setItem('s2s_user', JSON.stringify(nextUser));
+        window.dispatchEvent(new CustomEvent('s2s_profile_updated', { detail: nextUser }));
+      } catch {
+        // Ignore local sync errors; the backend update already succeeded.
+      }
+    }
+    return updated;
+  });
 }

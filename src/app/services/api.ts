@@ -6,7 +6,21 @@
  * auth headers or logging is done in one place.
  */
 
-const API_BASE_URL = '/api';
+export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined) || '/api';
+const API_FALLBACK_BASE_URL = 'http://localhost:8080/api';
+
+export function buildApiUrl(endpoint: string, baseUrl = API_BASE_URL): string {
+  return `${baseUrl}${endpoint}`;
+}
+
+export async function apiFetch(endpoint: string, options: RequestInit = {}): Promise<Response> {
+  try {
+    return await fetch(buildApiUrl(endpoint), options);
+  } catch (error) {
+    if (API_BASE_URL !== '/api') throw error;
+    return fetch(buildApiUrl(endpoint, API_FALLBACK_BASE_URL), options);
+  }
+}
 
 /**
  * Get the stored JWT token from localStorage.
@@ -59,12 +73,17 @@ export async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const url = `${API_BASE_URL}${endpoint}`;
-
-  const response = await fetch(url, {
+  const requestOptions: RequestInit = {
     ...options,
     headers: buildHeaders(options.headers as Record<string, string>),
-  });
+  };
+
+  let response: Response;
+  try {
+    response = await apiFetch(endpoint, requestOptions);
+  } catch (error) {
+    throw error;
+  }
 
   // If unauthorized, clear token and redirect to login
   if (response.status === 401) {
@@ -84,7 +103,12 @@ export async function apiRequest<T>(
     return undefined as T;
   }
 
-  return response.json();
+  const responseText = await response.text();
+  if (!responseText) {
+    return undefined as T;
+  }
+
+  return JSON.parse(responseText) as T;
 }
 
 /**

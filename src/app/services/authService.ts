@@ -14,6 +14,7 @@ export interface LoginResponse {
   role: string;
   nom: string;
   prenom: string;
+  photoUrl?: string | null;
 }
 
 export interface AuthUser {
@@ -24,6 +25,7 @@ export interface AuthUser {
   name: string;
   initials: string;
   avatarGradient: string;
+  photoUrl?: string | null;
 }
 
 /** Map backend role enum to frontend role key */
@@ -56,6 +58,7 @@ function toAuthUser(data: LoginResponse): AuthUser {
     name: fullName,
     initials,
     avatarGradient: GRADIENT_MAP[frontendRole],
+    photoUrl: data.photoUrl,
   };
 }
 
