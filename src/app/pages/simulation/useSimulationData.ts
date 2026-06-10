@@ -5,11 +5,13 @@ import { fetchRmResources, type RmResourceDTO } from '../../services/resourceMan
 import { fetchMyProfile } from '../../services/userService';
 import {
   simulerRemplacement,
+  simulerDepuisConflit,
   simulerSousCharge,
   validerSimulation,
   annulerSimulation,
   type SimulationRemplacementRequest,
   type SimulationRemplacementResponse,
+  type SimulationDepuisConflitRequest,
   type SimulationSousChargeRequest,
   type SimulationSousChargeResponse,
 } from '../../services/simulationService';
@@ -135,6 +137,17 @@ export function useSimulationData() {
     }
   };
 
+  const runConflitSimulation = async (req: SimulationDepuisConflitRequest) => {
+    setRunning(true); setResult(null); setValidated(false); setError(null);
+    try {
+      const res = await simulerDepuisConflit(req);
+      setResult(res);
+    } catch (e: any) {
+      setError(e.message || 'Erreur lors de la simulation depuis conflit');
+      throw e;
+    } finally { setRunning(false); }
+  };
+
   const validate = async (simId: number) => {
     try {
       await validerSimulation(simId);
@@ -177,6 +190,7 @@ export function useSimulationData() {
     error,
     setPeriod,
     runRemplacementSimulation,
+    runConflitSimulation,
     runSousChargeSimulation,
     validate,
     cancel,

@@ -1,4 +1,4 @@
-import { apiPost } from './api';
+import { apiGet, apiPost } from './api';
 
 /* ─── REMPLACEMENT Types ─── */
 
@@ -21,6 +21,9 @@ export interface SimulationRemplacementResponse {
   typeSimulation: 'REMPLACEMENT';
   resultat: 'POSITIF' | 'NEGATIF' | 'NEUTRE';
   commentaire: string;
+  dateDebut?: string;
+  dateFin?: string;
+  projetsConflit?: string[];
 
   collaborateurSource: string;
   joursSourceAvant: number;
@@ -40,6 +43,52 @@ export interface SimulationRemplacementResponse {
   nouvelleSurcharge: boolean;
   nouveauConflit: boolean;
   sousChargeReduite: boolean;
+}
+
+export interface CollaborateurDisponibleConflit {
+  id: number;
+  nom: string;
+  prenom: string;
+  email: string;
+  poste: string;
+  matricule: string;
+  tauxUtilisation: number;
+  tauxApresSimulation: number;
+  disponibilite: number;
+  joursDisponibles: number;
+}
+
+export interface SimulationConflitContext {
+  conflitId: number;
+  collaborateurSourceId: number;
+  collaborateurSourceNomComplet: string;
+  matricule: string;
+  dateDebut: string;
+  dateFin: string;
+  annee: number;
+  mois: number;
+  tauxCharge: number;
+  joursEnConflit: number;
+  description: string;
+  projetsConflit: ProjetConflit[];
+}
+
+export interface ProjetConflit {
+  projetId: number;
+  projetNom: string;
+  chefProjetNomComplet: string;
+  dateDebut: string;
+  dateFin: string;
+  tauxAffectation: number;
+  joursOuvrables: number;
+}
+
+export interface SimulationDepuisConflitRequest {
+  conflitId: number;
+  collaborateurCibleId: number;
+  resourceManagerId: number;
+  tauxAffectation?: number;
+  pays?: string;
 }
 
 /* ─── SOUS_CHARGE Types ─── */
@@ -93,6 +142,18 @@ export function simulerRemplacement(
       '/simulations/what-if/remplacement',
       request
   );
+}
+
+export function fetchSimulationConflitContext(conflitId: number): Promise<SimulationConflitContext> {
+  return apiGet<SimulationConflitContext>(`/simulations/what-if/conflits/${conflitId}/context`);
+}
+
+export function fetchCollaborateursDisponiblesConflit(conflitId: number): Promise<CollaborateurDisponibleConflit[]> {
+  return apiGet<CollaborateurDisponibleConflit[]>(`/simulations/what-if/conflits/${conflitId}/collaborateurs-disponibles`);
+}
+
+export function simulerDepuisConflit(request: SimulationDepuisConflitRequest): Promise<SimulationRemplacementResponse> {
+  return apiPost<SimulationRemplacementResponse>('/simulations/what-if/from-conflit', request);
 }
 
 /** Lancer une simulation sous-charge. */

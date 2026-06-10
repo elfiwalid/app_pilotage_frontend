@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router';
 import { AlertTriangle, Search, Mail, UserPlus, Eye, AlertCircle, TrendingUp, TrendingDown, Calendar, Users, CheckCircle, ArrowRight, ChevronLeft, ChevronRight, Clock, Play, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { C, R, PageHeader, BtnPrimary, BtnGhost, Avatar, Modal, ModalHeader, SectionLabel, cardStyle } from '../components/ui/design-system';
@@ -270,6 +271,7 @@ function DetailModal({ anomalie, onClose, onNotify, notified }: {
 
 /* ─── MAIN ─── */
 export function Conflicts() {
+  const navigate = useNavigate();
   const now = new Date();
   const [annee, setAnnee] = useState(now.getFullYear());
   const [mois, setMois] = useState(now.getMonth() + 1);
@@ -493,7 +495,7 @@ export function Conflicts() {
                     </button>
                     <BtnGhost onClick={() => setSelected(a)} small><Eye style={{ width: '12px', height: '12px' }} />Voir les détails</BtnGhost>
                     {isSurcharge && (
-                      <BtnPrimary onClick={() => setSelected(a)} small>
+                      <BtnPrimary onClick={() => navigate(`/simulation?conflitId=${a.id}`)} small>
                         <UserPlus style={{ width: '12px', height: '12px' }} />Proposer une ressource alternative
                       </BtnPrimary>
                     )}
