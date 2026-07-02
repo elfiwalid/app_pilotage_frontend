@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Search, Edit3, Clock, CheckCircle, ChevronRight, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router';
+import { Search, Edit3, Clock, Loader2, AlertTriangle, RefreshCw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { C, S, R, PageHeader, SectionCard, BtnPrimary, BtnGhost, Avatar, Modal, ModalHeader, SectionLabel, thStyle, tdStyle, cardStyle } from '../components/ui/design-system';
-import { fetchRmResources, type RmResourceDTO } from '../services/resourceManagerService';
+import { fetchRmResources, supprimerRmResource, type RmResourceDTO } from '../services/resourceManagerService';
 
-/* ─── HELPERS ─────────────────────────────────── */
+/* HELPERS */
 const MONTHS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
 
 const getStatus = (v: number) => v > 100
@@ -16,8 +16,29 @@ const getStatus = (v: number) => v > 100
 
 const AVATAR_COLORS = [C.purple, C.blue, C.green, C.magenta, '#F59E0B', C.cyan, '#8B5CF6'];
 
-/* ─── RESOURCE MODAL ─────────────────────────── */
-function ResourceModal({ resource, onClose }: { resource: RmResourceDTO; onClose: () => void }) {
+const compactThStyle: React.CSSProperties = {
+  ...thStyle,
+  padding: '7px 10px',
+  fontSize: '10px',
+  lineHeight: 1.15,
+};
+
+const compactTdStyle: React.CSSProperties = {
+  ...tdStyle,
+  padding: '6px 10px',
+  lineHeight: 1.15,
+};
+
+/* RESOURCE MODAL */
+function ResourceModal({
+  resource,
+  onClose,
+  onProjectClick,
+}: {
+  resource: RmResourceDTO;
+  onClose: () => void;
+  onProjectClick: (projectName: string) => void;
+}) {
   const [tab, setTab] = useState<'profile' | 'planning'>('profile');
   const st = getStatus(resource.tauxUtilisation);
   const fullName = `${resource.prenom} ${resource.nom}`;
@@ -63,8 +84,13 @@ function ResourceModal({ resource, onClose }: { resource: RmResourceDTO; onClose
                 {resource.projets.length === 0 ? (
                   <p style={{ fontSize: '12px', color: C.textMuted }}>Aucun projet actif.</p>
                 ) : resource.projets.map((p, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', borderRadius: R, border: `1px solid ${C.border}`, borderLeft: `3px solid ${p.couleur}`, marginBottom: '6px' }}>
+                  <div key={i} onClick={() => onProjectClick(p.projetNom)}
+                    title={`Voir le projet ${p.projetNom}`}
+                    style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', borderRadius: R, border: `1px solid ${C.border}`, borderLeft: `3px solid ${p.couleur}`, marginBottom: '6px', cursor: 'pointer', transition: 'background 0.12s, border-color 0.12s' }}
+                    onMouseEnter={e => { e.currentTarget.style.backgroundColor = C.bg; e.currentTarget.style.borderColor = `${p.couleur}55`; }}
+                    onMouseLeave={e => { e.currentTarget.style.backgroundColor = '#fff'; e.currentTarget.style.borderColor = C.border; }}>
                     <span style={{ fontSize: '12px', color: C.text, flex: 1, fontWeight: 600 }}>{p.projetNom}</span>
+                    <span style={{ fontSize: '10px', color: p.couleur, fontWeight: 800, marginRight: '4px' }}>Voir</span>
                     <span style={{ fontSize: '13px', fontWeight: 700, color: p.couleur }}>{p.tauxAffectation}%</span>
                   </div>
                 ))}
@@ -104,7 +130,7 @@ function ResourceModal({ resource, onClose }: { resource: RmResourceDTO; onClose
   );
 }
 
-/* ─── MAIN ─────────────────────────────────────── */
+/* MAIN */
 export function Resources() {
   const navigate = useNavigate();
   const [resources, setResources] = useState<RmResourceDTO[]>([]);
@@ -114,14 +140,13 @@ export function Resources() {
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [modal, setModal] = useState<RmResourceDTO | null>(null);
-  const [annee, setAnnee] = useState(new Date().getFullYear());
-  const [mois, setMois] = useState(new Date().getMonth() + 1);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const load = async () => {
     setLoading(true);
     setError(null);
     try {
-      setResources(await fetchRmResources(annee, mois));
+      setResources(await fetchRmResources());
     } catch (err: any) {
       setError(err.message || 'Impossible de charger les ressources.');
     } finally {
@@ -129,7 +154,27 @@ export function Resources() {
     }
   };
 
-  useEffect(() => { load(); }, [annee, mois]);
+  useEffect(() => { load(); }, []);
+
+  const handleDelete = async (resource: RmResourceDTO) => {
+    const fullName = `${resource.prenom} ${resource.nom}`;
+    const confirmed = window.confirm(
+      `Supprimer le collaborateur "${fullName}" ?\n\nSes affectations, taches, anomalies et donnees liees seront supprimees.`
+    );
+    if (!confirmed) return;
+
+    try {
+      setDeletingId(resource.id);
+      await supprimerRmResource(resource.id);
+      toast.success('Collaborateur supprime.');
+      setModal(current => current?.id === resource.id ? null : current);
+      await load();
+    } catch (err: any) {
+      toast.error(err.message || 'Impossible de supprimer le collaborateur.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const filtered = resources.filter(r => {
     const name = `${r.prenom} ${r.nom}`.toLowerCase();
@@ -139,6 +184,11 @@ export function Resources() {
     if (filterStatus === 'sous') return match && r.tauxUtilisation < 80;
     return match;
   });
+
+  const openProjectFromModal = (projectName: string) => {
+    setModal(null);
+    navigate(`/projects?search=${encodeURIComponent(projectName)}`);
+  };
 
   if (loading) {
     return (
@@ -165,18 +215,7 @@ export function Resources() {
   return (
     <div style={{ padding: '20px', backgroundColor: C.bg, minHeight: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-      <PageHeader title="Gestion des Ressources" subtitle={`${resources.length} collaborateurs · ${MONTHS[mois - 1]} ${annee}`}>
-        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-          <select value={mois} onChange={e => setMois(Number(e.target.value))}
-            style={{ padding: '6px 10px', fontSize: '12px', border: `1px solid ${C.border}`, borderRadius: R, backgroundColor: '#fff', cursor: 'pointer' }}>
-            {MONTHS.map((l, i) => <option key={i + 1} value={i + 1}>{l}</option>)}
-          </select>
-          <select value={annee} onChange={e => setAnnee(Number(e.target.value))}
-            style={{ padding: '6px 10px', fontSize: '12px', border: `1px solid ${C.border}`, borderRadius: R, backgroundColor: '#fff', cursor: 'pointer' }}>
-            {[2025, 2026, 2027, 2028].map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
-        </div>
-      </PageHeader>
+      <PageHeader title="Gestion des Ressources" subtitle={`${resources.length} collaborateurs`} />
 
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '12px' }}>
@@ -197,7 +236,7 @@ export function Resources() {
 
       {/* Legend */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-        {[{ c: C.green, l: 'Optimal (80–100%)' }, { c: '#F59E0B', l: 'Sous-util. (<80%)' }, { c: C.red, l: 'Surcharge (>100%)' }].map(item => (
+        {[{ c: C.green, l: 'Optimal (80-100%)' }, { c: '#F59E0B', l: 'Sous-util. (<80%)' }, { c: C.red, l: 'Surcharge (>100%)' }].map(item => (
           <div key={item.l} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: C.textMuted }}>
             <div style={{ width: '10px', height: '10px', borderRadius: '2px', backgroundColor: item.c }} />{item.l}
           </div>
@@ -211,14 +250,14 @@ export function Resources() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '200px' }}>
             <div style={{ position: 'relative', flex: 1, maxWidth: '260px' }}>
               <Search style={{ position: 'absolute', left: '9px', top: '50%', transform: 'translateY(-50%)', width: '13px', height: '13px', color: C.textMuted, pointerEvents: 'none' }} />
-              <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher…"
+              <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher..."
                 style={{ width: '100%', paddingLeft: '28px', paddingRight: '10px', paddingTop: '6px', paddingBottom: '6px', fontSize: '12px', border: `1px solid ${C.border}`, borderRadius: R, backgroundColor: C.bg, outline: 'none' }}
                 onFocus={e => (e.target.style.borderColor = C.purple)} onBlur={e => (e.target.style.borderColor = C.border)} />
             </div>
             <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
               style={{ padding: '6px 10px', fontSize: '12px', border: `1px solid ${C.border}`, borderRadius: R, backgroundColor: '#fff', outline: 'none', cursor: 'pointer' }}>
               <option value="all">Tous les statuts</option>
-              <option value="optimal">Optimal (80–100%)</option>
+              <option value="optimal">Optimal (80-100%)</option>
               <option value="surcharge">Surcharge (&gt;100%)</option>
               <option value="sous">Sous-utilisation (&lt;80%)</option>
             </select>
@@ -240,7 +279,7 @@ export function Resources() {
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
-                <tr>{['Collaborateur', 'Poste', 'Projets', 'Utilisation', 'Statut', 'Actions'].map(h => <th key={h} style={thStyle}>{h}</th>)}</tr>
+                <tr>{['Collaborateur', 'Poste', 'Projets', 'Utilisation', 'Statut', 'Actions'].map(h => <th key={h} style={compactThStyle}>{h}</th>)}</tr>
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
@@ -252,45 +291,61 @@ export function Resources() {
                     <tr key={r.id} style={{ transition: 'background 0.1s' }}
                       onMouseEnter={e => (e.currentTarget.style.backgroundColor = C.bg)}
                       onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}>
-                      <td style={{ ...tdStyle, borderBottom: idx < filtered.length - 1 ? `1px solid ${C.borderLight}` : 'none' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <Avatar name={fullName} color={AVATAR_COLORS[idx % AVATAR_COLORS.length]} size={30} />
+                      <td style={{ ...compactTdStyle, borderBottom: idx < filtered.length - 1 ? `1px solid ${C.borderLight}` : 'none' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Avatar name={fullName} color={AVATAR_COLORS[idx % AVATAR_COLORS.length]} size={24} />
                           <div>
-                            <p style={{ fontSize: '13px', fontWeight: 600, color: C.text, lineHeight: 1.3 }}>{fullName}</p>
-                            <p style={{ fontSize: '10px', color: C.textMuted, lineHeight: 1.3 }}>{r.email}</p>
+                            <p style={{ fontSize: '12px', fontWeight: 700, color: C.text, lineHeight: 1.15 }}>{fullName}</p>
+                            <p style={{ fontSize: '9px', color: C.textMuted, lineHeight: 1.15 }}>{r.email}</p>
                           </div>
                         </div>
                       </td>
-                      <td style={{ ...tdStyle, borderBottom: idx < filtered.length - 1 ? `1px solid ${C.borderLight}` : 'none' }}>
-                        <span style={{ fontSize: '12px', color: C.textSecondary }}>{r.poste || '—'}</span>
+                      <td style={{ ...compactTdStyle, borderBottom: idx < filtered.length - 1 ? `1px solid ${C.borderLight}` : 'none' }}>
+                        <span style={{ fontSize: '11px', color: C.textSecondary }}>{r.poste || '-'}</span>
                       </td>
-                      <td style={{ ...tdStyle, borderBottom: idx < filtered.length - 1 ? `1px solid ${C.borderLight}` : 'none' }}>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                      <td style={{ ...compactTdStyle, borderBottom: idx < filtered.length - 1 ? `1px solid ${C.borderLight}` : 'none' }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
                           {r.projets.length === 0 ? (
-                            <span style={{ fontSize: '10px', color: C.textMuted }}>Aucun</span>
+                            <span style={{ fontSize: '9px', color: C.textMuted }}>Aucun</span>
                           ) : r.projets.map((p, i) => (
-                            <span key={i} style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '3px', backgroundColor: `${p.couleur}10`, border: `1px solid ${p.couleur}30`, color: p.couleur }}>
+                            <span key={i} style={{ fontSize: '9px', fontWeight: 700, padding: '1px 5px', borderRadius: '3px', backgroundColor: `${p.couleur}10`, border: `1px solid ${p.couleur}30`, color: p.couleur, lineHeight: 1.2 }}>
                               {p.projetNom}
                             </span>
                           ))}
                         </div>
                       </td>
-                      <td style={{ ...tdStyle, borderBottom: idx < filtered.length - 1 ? `1px solid ${C.borderLight}` : 'none' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <div style={{ width: '72px', height: '4px', borderRadius: '2px', backgroundColor: C.borderLight, overflow: 'hidden' }}>
+                      <td style={{ ...compactTdStyle, borderBottom: idx < filtered.length - 1 ? `1px solid ${C.borderLight}` : 'none' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <div style={{ width: '66px', height: '4px', borderRadius: '2px', backgroundColor: C.borderLight, overflow: 'hidden' }}>
                             <div style={{ height: '100%', borderRadius: '2px', backgroundColor: st.bar, width: `${Math.min(r.tauxUtilisation, 100)}%` }} />
                           </div>
-                          <span style={{ fontSize: '12px', fontWeight: 700, color: st.text, backgroundColor: st.bg, border: `1px solid ${st.border}`, padding: '1px 6px', borderRadius: '3px' }}>{r.tauxUtilisation}%</span>
+                          <span style={{ fontSize: '10px', fontWeight: 800, color: st.text, backgroundColor: st.bg, border: `1px solid ${st.border}`, padding: '1px 5px', borderRadius: '3px', lineHeight: 1.2 }}>{r.tauxUtilisation}%</span>
                         </div>
                       </td>
-                      <td style={{ ...tdStyle, borderBottom: idx < filtered.length - 1 ? `1px solid ${C.borderLight}` : 'none' }}>
-                        <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '3px', backgroundColor: st.bg, border: `1px solid ${st.border}`, color: st.text }}>{st.label}</span>
+                      <td style={{ ...compactTdStyle, borderBottom: idx < filtered.length - 1 ? `1px solid ${C.borderLight}` : 'none' }}>
+                        <span style={{ fontSize: '9px', fontWeight: 800, padding: '1px 6px', borderRadius: '3px', backgroundColor: st.bg, border: `1px solid ${st.border}`, color: st.text, lineHeight: 1.2 }}>{st.label}</span>
                       </td>
-                      <td style={{ ...tdStyle, borderBottom: idx < filtered.length - 1 ? `1px solid ${C.borderLight}` : 'none' }}>
-                        <button onClick={() => setModal(r)} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: R, border: `1px solid ${C.border}`, backgroundColor: '#fff', cursor: 'pointer', fontSize: '11px', fontWeight: 600, color: C.textSecondary }}
-                          onMouseEnter={e => (e.currentTarget.style.backgroundColor = C.bg)} onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#fff')}>
-                          <Edit3 style={{ width: '11px', height: '11px' }} />Détail
-                        </button>
+                      <td style={{ ...compactTdStyle, borderBottom: idx < filtered.length - 1 ? `1px solid ${C.borderLight}` : 'none' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+                          <button onClick={() => setModal(r)} style={{ display: 'flex', alignItems: 'center', gap: '3px', padding: '3px 8px', borderRadius: R, border: `1px solid ${C.border}`, backgroundColor: '#fff', cursor: 'pointer', fontSize: '10px', fontWeight: 700, color: C.textSecondary, lineHeight: 1.2 }}
+                            onMouseEnter={e => (e.currentTarget.style.backgroundColor = C.bg)} onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#fff')}>
+                            <Edit3 style={{ width: '10px', height: '10px' }} />Detail
+                          </button>
+                          <button
+                            onClick={() => handleDelete(r)}
+                            disabled={deletingId === r.id}
+                            style={{ display: 'flex', alignItems: 'center', gap: '3px', padding: '3px 8px', borderRadius: R, border: `1px solid ${C.red}`, backgroundColor: C.red, cursor: deletingId === r.id ? 'not-allowed' : 'pointer', fontSize: '10px', fontWeight: 700, color: '#fff', opacity: deletingId === r.id ? 0.65 : 1, lineHeight: 1.2 }}
+                            onMouseEnter={e => { if (deletingId !== r.id) e.currentTarget.style.backgroundColor = '#B91C1C'; }}
+                            onMouseLeave={e => (e.currentTarget.style.backgroundColor = C.red)}
+                          >
+                            {deletingId === r.id ? (
+                              <Loader2 style={{ width: '10px', height: '10px', animation: 'spin 1s linear infinite' }} />
+                            ) : (
+                              <Trash2 style={{ width: '10px', height: '10px' }} />
+                            )}
+                            Supprimer
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -303,7 +358,7 @@ export function Resources() {
           <div style={{ padding: '20px', overflowX: 'auto' }}>
             <div style={{ marginBottom: '14px' }}>
               <p style={{ fontSize: '13px', fontWeight: 700, color: C.text, marginBottom: '2px' }}>
-                Heatmap — Taux de charge mensuel ({annee})
+                Heatmap - Taux de charge mensuel 
               </p>
               <p style={{ fontSize: '11px', color: C.textMuted }}>Basé sur les jours ouvrables par rapport à la capacité mensuelle</p>
             </div>
@@ -327,7 +382,7 @@ export function Resources() {
                           <Avatar name={fullName} color={AVATAR_COLORS[idx % AVATAR_COLORS.length]} size={26} />
                           <div>
                             <p style={{ fontSize: '12px', fontWeight: 600, color: C.text }}>{fullName}</p>
-                            <p style={{ fontSize: '10px', color: C.textMuted }}>{r.poste || '—'}</p>
+                            <p style={{ fontSize: '10px', color: C.textMuted }}>{r.poste || '-'}</p>
                           </div>
                         </div>
                       </td>
@@ -354,7 +409,7 @@ export function Resources() {
         )}
       </div>
 
-      {modal && <ResourceModal resource={modal} onClose={() => setModal(null)} />}
+      {modal && <ResourceModal resource={modal} onClose={() => setModal(null)} onProjectClick={openProjectFromModal} />}
     </div>
   );
 }

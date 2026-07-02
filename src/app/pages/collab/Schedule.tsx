@@ -1,14 +1,40 @@
 import { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Calendar, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
-import { C, R, PageHeader, SectionCard, cardStyle } from '../../components/ui/design-system';
+import { C, R, PageHeader, SectionCard, cardStyle, Modal, ModalHeader, BtnPrimary, BtnGhost } from '../../components/ui/design-system';
 import { useAuth } from '../../context/AuthContext';
-import { fetchCollabPlanning, type CollabPlanningJourDTO, type SlotDTO, type TacheJourDTO } from '../../services/collaborateurService';
+import { toast } from 'sonner';
+import { fetchCollabPlanning, updateCollabTache, type CollabPlanningJourDTO, type SlotDTO, type StatutTache, type TacheJourDTO } from '../../services/collaborateurService';
 
 const DAY_NAMES = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 const MONTH_NAMES = [
   'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
   'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
 ];
+
+const TASK_STATUS_LABELS: Record<StatutTache, string> = {
+  EN_ATTENTE: 'En attente',
+  EN_COURS: 'En cours',
+  TERMINEE: 'Terminée',
+  BLOQUEE: 'Bloquée',
+};
+
+const TASK_STATUS_COLORS: Record<StatutTache, string> = {
+  EN_ATTENTE: '#64748B',
+  EN_COURS: '#D97706',
+  TERMINEE: C.green,
+  BLOQUEE: C.red,
+};
+
+const TASK_STATUS_STYLES: Record<StatutTache, { bg: string; border: string; text: string; marker: string }> = {
+  EN_ATTENTE: { bg: '#F8FAFC', border: '#CBD5E1', text: '#475569', marker: '' },
+  EN_COURS: { bg: '#FFFBEB', border: '#F59E0B', text: '#92400E', marker: '' },
+  TERMINEE: { bg: '#ECFDF5', border: C.green, text: '#047857', marker: '✓' },
+  BLOQUEE: { bg: '#FEF2F2', border: C.red, text: '#B91C1C', marker: '!' },
+};
+
+function taskStatusStyle(statut?: StatutTache) {
+  return TASK_STATUS_STYLES[statut || 'EN_ATTENTE'];
+}
 
 /** Offset Lundi=0 ... Dimanche=6 pour le 1er jour du mois */
 function firstDayOffset(year: number, month: number): number {
@@ -36,6 +62,10 @@ export function CollabSchedule() {
   const [month, setMonth] = useState(now.getMonth() + 1); // 1-12
   const [planning, setPlanning] = useState<CollabPlanningJourDTO[]>([]);
   const [selectedDay, setSelectedDay] = useState<number | null>(now.getDate());
+  const [selectedTask, setSelectedTask] = useState<TacheJourDTO | null>(null);
+  const [taskStatus, setTaskStatus] = useState<StatutTache>('EN_ATTENTE');
+  const [taskDone, setTaskDone] = useState(false);
+  const [savingTask, setSavingTask] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,6 +82,31 @@ export function CollabSchedule() {
   };
 
   useEffect(() => { load(year, month); }, [year, month]);
+
+  const openTask = (task: TacheJourDTO) => {
+    setSelectedTask(task);
+    const statut = task.statut || 'EN_ATTENTE';
+    setTaskStatus(statut);
+    setTaskDone(statut === 'TERMINEE' || (task.pourcentageAvancement ?? 0) === 100);
+  };
+
+  const saveTask = async () => {
+    if (!selectedTask) return;
+    setSavingTask(true);
+    try {
+      await updateCollabTache(selectedTask.id, {
+        statut: taskStatus,
+        pourcentageAvancement: taskStatus === 'TERMINEE' ? 100 : 0,
+      });
+      toast.success('Tâche mise à jour.');
+      setSelectedTask(null);
+      await load(year, month);
+    } catch (err: any) {
+      toast.error(err.message || 'Impossible de mettre à jour la tâche.');
+    } finally {
+      setSavingTask(false);
+    }
+  };
 
   const prevMonth = () => {
     if (month === 1) { setMonth(12); setYear(y => y - 1); }
@@ -185,11 +240,28 @@ export function CollabSchedule() {
                       ))}
                       {slots.length > 2 && <span style={{ fontSize: '8px', color: C.textMuted }}>+{slots.length - 2}</span>}
 
-                      {taches.slice(0, 2).map((t, ti) => (
-                        <div key={`t-${ti}`} style={{ fontSize: '7px', fontWeight: 700, color: C.textSecondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>
-                          {t.tache}
-                        </div>
-                      ))}
+                      {taches.slice(0, 2).map((t, ti) => {
+                        const st = t.statut || 'EN_ATTENTE';
+                        const style = taskStatusStyle(st);
+                        return (
+                          <div key={`t-${ti}`} onClick={e => { e.stopPropagation(); openTask(t); }}
+                            title={`${t.tache} - ${TASK_STATUS_LABELS[st]}`}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: '2px', maxWidth: '100%',
+                              marginTop: '2px', padding: '1px 3px', borderRadius: '3px',
+                              border: `1px solid ${style.border}55`, backgroundColor: style.bg,
+                              color: style.text, fontSize: '7px', fontWeight: 800, lineHeight: 1.2,
+                              cursor: 'pointer', overflow: 'hidden',
+                            }}>
+                            {style.marker && <span style={{ flexShrink: 0, fontSize: '8px', lineHeight: 1 }}>{style.marker}</span>}
+                            <span style={{
+                              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                              textDecoration: st === 'TERMINEE' ? 'line-through' : 'none',
+                            }}>{t.tache}</span>
+                            <span style={{ flexShrink: 0, fontSize: '6px', fontWeight: 900 }}>{TASK_STATUS_LABELS[st]}</span>
+                          </div>
+                        );
+                      })}
                       {taches.length > 2 && <span style={{ fontSize: '8px', color: C.textMuted }}>+{taches.length - 2} taches</span>}
 
                       {/* Total bar */}
@@ -242,9 +314,16 @@ export function CollabSchedule() {
                       </div>
                     ))}
                     {(tachesByDay[selectedDay] || []).map((t, i) => (
-                      <div key={`task-${i}`} style={{ padding: '7px 10px', borderRadius: R, border: `1px solid ${C.border}`, backgroundColor: C.bg }}>
-                        <p style={{ fontSize: '11px', fontWeight: 700, color: C.text }}>{t.tache}</p>
-                        <p style={{ fontSize: '10px', color: C.textMuted }}>{t.projet}</p>
+                      <div key={`task-${i}`} onClick={() => openTask(t)}
+                        style={{ padding: '8px 10px', borderRadius: R, border: `1px solid ${taskStatusStyle(t.statut).border}55`, borderLeft: `3px solid ${taskStatusStyle(t.statut).border}`, backgroundColor: taskStatusStyle(t.statut).bg, cursor: 'pointer' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                          <p style={{ fontSize: '11px', fontWeight: 800, color: taskStatusStyle(t.statut).text, textDecoration: (t.statut || 'EN_ATTENTE') === 'TERMINEE' ? 'line-through' : 'none' }}>
+                            {taskStatusStyle(t.statut).marker && <span style={{ marginRight: '4px' }}>{taskStatusStyle(t.statut).marker}</span>}
+                            {t.tache}
+                          </p>
+                          <span style={{ fontSize: '9px', fontWeight: 900, color: taskStatusStyle(t.statut).text, padding: '2px 6px', borderRadius: '999px', backgroundColor: '#fff', border: `1px solid ${taskStatusStyle(t.statut).border}55`, flexShrink: 0 }}>{TASK_STATUS_LABELS[t.statut || 'EN_ATTENTE']}</span>
+                        </div>
+                        <p style={{ fontSize: '10px', color: C.textMuted }}>{t.projet} · {TASK_STATUS_LABELS[t.statut || 'EN_ATTENTE']}</p>
                       </div>
                     ))}
                     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', borderRadius: R, backgroundColor: C.bg, border: `1px solid ${C.border}` }}>
@@ -280,6 +359,58 @@ export function CollabSchedule() {
           </div>
         </div>
       </div>
+
+      {selectedTask && (
+        <Modal onClose={() => setSelectedTask(null)} maxWidth="420px" accentColor={TASK_STATUS_COLORS[taskStatus]}>
+          <ModalHeader title="Suivi de tâche" subtitle={selectedTask.projet} onClose={() => setSelectedTask(null)} />
+          <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ padding: '10px 12px', borderRadius: R, backgroundColor: C.bg, border: `1px solid ${C.border}` }}>
+              <p style={{ fontSize: '13px', fontWeight: 800, color: C.text }}>{selectedTask.tache}</p>
+              <p style={{ fontSize: '11px', color: C.textMuted, marginTop: '3px' }}>
+                {selectedDay ? `${selectedDay} ${MONTH_NAMES[month - 1]} ${year}` : ''}
+              </p>
+            </div>
+
+            <div>
+              <label style={{ fontSize: '10px', fontWeight: 800, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Statut</label>
+              <select value={taskStatus} onChange={e => {
+                const next = e.target.value as StatutTache;
+                setTaskStatus(next);
+                setTaskDone(next === 'TERMINEE');
+              }} style={{ width: '100%', marginTop: '5px', padding: '8px 10px', borderRadius: R, border: `1px solid ${C.border}`, fontSize: '12px' }}>
+                {Object.entries(TASK_STATUS_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ padding: '10px 12px', borderRadius: R, border: `1px solid ${C.border}`, backgroundColor: C.bg }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', fontWeight: 700, color: C.text, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={taskDone}
+                  onChange={e => {
+                    const checked = e.target.checked;
+                    setTaskDone(checked);
+                    setTaskStatus(checked ? 'TERMINEE' : 'EN_COURS');
+                  }}
+                />
+                Tâche terminée
+              </label>
+              <p style={{ fontSize: '10px', color: C.textMuted, marginTop: '6px' }}>
+                Une tâche terminée est enregistrée automatiquement à 100%, les autres statuts à 0%.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', paddingTop: '8px', borderTop: `1px solid ${C.borderLight}` }}>
+              <BtnPrimary onClick={saveTask} disabled={savingTask}>
+                {savingTask ? 'Enregistrement...' : 'Enregistrer'}
+              </BtnPrimary>
+              <BtnGhost onClick={() => setSelectedTask(null)}>Annuler</BtnGhost>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

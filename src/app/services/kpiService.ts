@@ -7,6 +7,20 @@ export interface KPISummary {
   evolution: Record<string, number>;
 }
 
-export function fetchKPISummary(): Promise<KPISummary> {
-  return apiGet<KPISummary>('/kpis/summary');
+interface RmDashboardKpiDTO {
+  tauxStaffingGlobal: number;
+  ressourcesSousUtilisees: number;
+  staffingMensuel: { mois: string; tauxStaffing: number }[];
+}
+
+export async function fetchKPISummary(): Promise<KPISummary> {
+  const dashboard = await apiGet<RmDashboardKpiDTO>('/rm/dashboard');
+  return {
+    tauxOccupation: dashboard.tauxStaffingGlobal,
+    tnf: dashboard.ressourcesSousUtilisees,
+    occupationParCollab: {},
+    evolution: Object.fromEntries(
+      dashboard.staffingMensuel.map(item => [item.mois, item.tauxStaffing])
+    ),
+  };
 }

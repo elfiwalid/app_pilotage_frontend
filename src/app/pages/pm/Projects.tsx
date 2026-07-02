@@ -19,6 +19,7 @@ import { PrevisionHistoryView } from '../../components/prevision/PrevisionHistor
 import { PrevisionActiveCard } from '../../components/prevision/PrevisionActiveCard';
 import { PrevisionStatsCard } from '../../components/prevision/PrevisionStatsCard';
 import type { PrevisionResponseDTO } from '../../services/previsionService';
+import { fetchTachesProjet, type StatutTache, type TacheCollaborateurDTO } from '../../services/tacheService';
 
 /* ─── TYPES ─────────────────────────────────────── */
 interface Project {
@@ -39,6 +40,20 @@ const STATUS_MAP: Record<string, { label: string; bg: string; text: string; dot:
   'PLANIFIE': { label: 'Planifié', bg: '#FFFBEB', text: '#92400E', dot: '#F59E0B', accent: '#F59E0B' },
   'TERMINE':  { label: 'Terminé', bg: '#ECFDF5', text: '#065F46', dot: C.green, accent: C.green },
   'SUSPENDU': { label: 'Suspendu', bg: '#FEF2F2', text: '#991B1B', dot: C.red, accent: C.red },
+};
+
+const TASK_STATUS_LABELS: Record<StatutTache, string> = {
+  EN_ATTENTE: 'En attente',
+  EN_COURS: 'En cours',
+  TERMINEE: 'Terminée',
+  BLOQUEE: 'Bloquée',
+};
+
+const TASK_STATUS_COLORS: Record<StatutTache, string> = {
+  EN_ATTENTE: '#64748B',
+  EN_COURS: '#D97706',
+  TERMINEE: C.green,
+  BLOQUEE: C.red,
 };
 
 
@@ -260,9 +275,28 @@ function ProjectDetailModal({
 }) {
   const sc = STATUS_MAP[project.statut] || STATUS_MAP['PLANIFIE'];
   const [localActivePrevision, setLocalActivePrevision] = useState<PrevisionResponseDTO | null>(null);
+  const [taches, setTaches] = useState<TacheCollaborateurDTO[]>([]);
+  const [loadingTaches, setLoadingTaches] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingTaches(true);
+    fetchTachesProjet(project.id)
+      .then(data => { if (!cancelled) setTaches(data); })
+      .catch(() => { if (!cancelled) setTaches([]); })
+      .finally(() => { if (!cancelled) setLoadingTaches(false); });
+    return () => { cancelled = true; };
+  }, [project.id, refreshKey]);
+
+  const totalTaches = taches.length;
+  const tachesTerminees = taches.filter(t => t.statut === 'TERMINEE').length;
+  const tachesEnCours = taches.filter(t => t.statut === 'EN_COURS').length;
+  const tachesBloquees = taches.filter(t => t.statut === 'BLOQUEE').length;
+  const tachesEnAttente = taches.filter(t => t.statut === 'EN_ATTENTE').length;
+  const avancementGlobal = totalTaches === 0 ? 0 : Math.round((tachesTerminees / totalTaches) * 100);
 
   return (
-    <Modal onClose={onClose} maxWidth="640px" accentColor={sc.accent}>
+    <Modal onClose={onClose} maxWidth="780px" accentColor={sc.accent}>
       <ModalHeader title={project.nom} subtitle={`Chef de projet : ${project.chefProjetNomComplet}`} onClose={onClose} />
       <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
         {/* Status + dates */}
@@ -317,7 +351,7 @@ function ProjectDetailModal({
                 onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
                 onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
               >
-                <Upload style={{ width: '12px', height: '12px' }} />Importer les tÃ¢ches
+                <Upload style={{ width: '12px', height: '12px' }} />Importer les tâches
               </button>
               <button onClick={onShowHistory}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: R, border: `1px solid ${C.border}`, backgroundColor: '#fff', color: C.text, cursor: 'pointer', fontSize: '11px', fontWeight: 700 }}
@@ -337,6 +371,71 @@ function ProjectDetailModal({
           />
 
           <PrevisionStatsCard previsionId={localActivePrevision?.id ?? null} />
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingTop: '6px', borderTop: `1px solid ${C.borderLight}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+            <p style={{ fontSize: '12px', fontWeight: 700, color: C.text, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Suivi des tâches
+            </p>
+            <span style={{ fontSize: '11px', fontWeight: 800, color: C.blue }}>{avancementGlobal}% global</span>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: '8px' }}>
+            {[
+              { l: 'Total', v: totalTaches, c: C.text },
+              { l: 'Terminées', v: tachesTerminees, c: C.green },
+              { l: 'En cours', v: tachesEnCours, c: '#D97706' },
+              { l: 'Bloquées', v: tachesBloquees, c: C.red },
+              { l: 'En attente', v: tachesEnAttente, c: C.textMuted },
+              { l: 'Avancement', v: `${avancementGlobal}%`, c: C.purple },
+            ].map(item => (
+              <div key={item.l} style={{ padding: '8px 10px', borderRadius: R, border: `1px solid ${C.border}`, backgroundColor: C.bg }}>
+                <p style={{ fontSize: '10px', color: C.textMuted, fontWeight: 800 }}>{item.l}</p>
+                <p style={{ fontSize: '15px', color: item.c, fontWeight: 900 }}>{item.v}</p>
+              </div>
+            ))}
+          </div>
+
+          {loadingTaches ? (
+            <p style={{ fontSize: '12px', color: C.textMuted, padding: '12px', textAlign: 'center' }}>Chargement des tâches...</p>
+          ) : taches.length === 0 ? (
+            <p style={{ fontSize: '12px', color: C.textMuted, padding: '12px', textAlign: 'center', border: `1px dashed ${C.border}`, borderRadius: R }}>
+              Aucune tâche importée pour ce projet.
+            </p>
+          ) : (
+            <div style={{ maxHeight: '210px', overflow: 'auto', border: `1px solid ${C.border}`, borderRadius: R }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                <thead>
+                  <tr style={{ backgroundColor: C.bg }}>
+                    {['Collaborateur', 'Tâche', 'Date', 'Statut', 'Avancement'].map(h => (
+                      <th key={h} style={{ textAlign: 'left', padding: '8px 10px', color: C.textMuted, fontWeight: 800, borderBottom: `1px solid ${C.border}` }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {taches.map(t => (
+                    <tr key={t.id}>
+                      <td style={{ padding: '8px 10px', borderBottom: `1px solid ${C.borderLight}`, fontWeight: 700, color: C.text }}>{t.collaborateurNomComplet}</td>
+                      <td style={{ padding: '8px 10px', borderBottom: `1px solid ${C.borderLight}`, color: C.textSecondary }}>{t.tache}</td>
+                      <td style={{ padding: '8px 10px', borderBottom: `1px solid ${C.borderLight}`, color: C.textMuted }}>{formatDate(t.dateTache)}</td>
+                      <td style={{ padding: '8px 10px', borderBottom: `1px solid ${C.borderLight}` }}>
+                        <span style={{ color: TASK_STATUS_COLORS[t.statut], fontWeight: 800 }}>{TASK_STATUS_LABELS[t.statut]}</span>
+                      </td>
+                      <td style={{ padding: '8px 10px', borderBottom: `1px solid ${C.borderLight}` }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{ flex: 1, height: '5px', borderRadius: '3px', backgroundColor: C.borderLight, overflow: 'hidden' }}>
+                            <div style={{ width: `${t.pourcentageAvancement ?? 0}%`, height: '100%', backgroundColor: TASK_STATUS_COLORS[t.statut] }} />
+                          </div>
+                          <span style={{ minWidth: '32px', textAlign: 'right', fontWeight: 800, color: C.text }}>{t.pourcentageAvancement ?? 0}%</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         {/* Actions */}

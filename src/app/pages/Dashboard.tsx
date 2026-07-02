@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { TrendingUp, Users, AlertTriangle, UserCheck, UserX, ArrowUpRight, Loader2, Calendar, RefreshCw } from 'lucide-react';
+import { TrendingUp, Users, AlertTriangle, UserCheck, UserX, ArrowUpRight, Loader2 } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { C, S, R, PageHeader, SectionCard, KpiCard, cardStyle } from '../components/ui/design-system';
 import { useNavigate } from 'react-router';
 import { fetchRmDashboard, type RmDashboardDTO } from '../services/resourceManagerService';
 
-/* ─── TOOLTIP ────────────────────────────────────── */
+/* TOOLTIP */
 const ChartTip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
   return (
@@ -32,22 +32,16 @@ const TYPE_LABELS: Record<string, string> = {
   DISPONIBILITE_INSUFFISANTE: 'Sous-util.',
 };
 
-/* ─── COMPONENT ─────────────────────────────────── */
+/* COMPONENT */
 export function Dashboard() {
   const navigate = useNavigate();
   const [data, setData] = useState<RmDashboardDTO | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const now = new Date();
-  const [selAnnee, setSelAnnee] = useState(now.getFullYear());
-  const [selMois, setSelMois] = useState(now.getMonth() + 1);
-
-  const MOIS_OPTIONS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
-
   const loadData = async () => {
     setLoading(true);
     try {
-      const d = await fetchRmDashboard(selAnnee, selMois);
+      const d = await fetchRmDashboard();
       setData(d);
     } catch {
       setData(null);
@@ -56,7 +50,7 @@ export function Dashboard() {
     }
   };
 
-  useEffect(() => { loadData(); }, [selAnnee, selMois]);
+  useEffect(() => { loadData(); }, []);
 
   if (loading) {
     return (
@@ -74,45 +68,26 @@ export function Dashboard() {
     );
   }
 
-  const periodeLabel = `${MOIS_OPTIONS[selMois - 1]} ${selAnnee}`;
-
   const kpiData = [
     { title: 'Taux de Staffing', value: `${data.tauxStaffingGlobal}%`, trendPositive: data.tauxStaffingGlobal >= 90, icon: UserCheck, accent: C.purple, sub: 'moyenne globale' },
     { title: 'Collaborateurs Actifs', value: String(data.collaborateursActifs), trendPositive: true, icon: Users, accent: C.blue, sub: `sur ${data.totalCollaborateurs} total` },
-    { title: 'Conflits Détectés', value: String(data.conflitsDetectes), trendPositive: data.conflitsDetectes === 0, icon: AlertTriangle, accent: C.red, sub: 'anomalies ouvertes' },
-    { title: 'Ressources Surchargées', value: String(data.ressourcesSurchargees), trendPositive: data.ressourcesSurchargees === 0, icon: TrendingUp, accent: '#F59E0B', sub: '>100% allocation' },
-    { title: 'Sous-utilisées', value: String(data.ressourcesSousUtilisees), trendPositive: data.ressourcesSousUtilisees === 0, icon: UserX, accent: C.cyan, sub: '<80% allocation' },
+    { title: 'Conflits Detectes', value: String(data.conflitsDetectes), trendPositive: data.conflitsDetectes === 0, icon: AlertTriangle, accent: C.red, sub: 'anomalies ouvertes' },
+    { title: 'Ressources Surchargees', value: String(data.ressourcesSurchargees), trendPositive: data.ressourcesSurchargees === 0, icon: TrendingUp, accent: '#F59E0B', sub: '>100% allocation' },
+    { title: 'Sous-utilisees', value: String(data.ressourcesSousUtilisees), trendPositive: data.ressourcesSousUtilisees === 0, icon: UserX, accent: C.cyan, sub: '<80% allocation' },
   ];
 
   const totalProjets = data.projetsEnCours + data.projetsPlanifies + data.projetsTermines;
   const projectDist = [
     { name: 'En cours', value: data.projetsEnCours, color: C.purple },
-    { name: 'Planifiés', value: data.projetsPlanifies, color: '#F59E0B' },
-    { name: 'Terminés', value: data.projetsTermines, color: C.green },
+    { name: 'Planifies', value: data.projetsPlanifies, color: '#F59E0B' },
+    { name: 'Termines', value: data.projetsTermines, color: C.green },
   ].filter(p => p.value > 0);
 
   return (
     <div style={{ padding: '20px', backgroundColor: C.bg, minHeight: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
       {/* Header */}
-      <PageHeader title="Dashboard — Vue Globale" subtitle={`Pilotage des ressources et détection des anomalies de staffing · ${periodeLabel}`}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Calendar style={{ width: '14px', height: '14px', color: C.textMuted }} />
-          <select value={selMois} onChange={e => setSelMois(Number(e.target.value))}
-            style={{ padding: '5px 8px', fontSize: '12px', fontWeight: 600, border: `1px solid ${C.border}`, borderRadius: R, backgroundColor: '#fff', cursor: 'pointer', outline: 'none' }}>
-            {MOIS_OPTIONS.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
-          </select>
-          <select value={selAnnee} onChange={e => setSelAnnee(Number(e.target.value))}
-            style={{ padding: '5px 8px', fontSize: '12px', fontWeight: 600, border: `1px solid ${C.border}`, borderRadius: R, backgroundColor: '#fff', cursor: 'pointer', outline: 'none' }}>
-            {[2025, 2026, 2027, 2028].map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
-          <button onClick={loadData} disabled={loading}
-            style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 10px', borderRadius: R, border: `1px solid ${C.border}`, background: '#fff', color: C.textMuted, fontSize: '11px', fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1 }}>
-            <RefreshCw style={{ width: '12px', height: '12px', animation: loading ? 'spin 1s linear infinite' : 'none' }} />
-          </button>
-          <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
-        </div>
-      </PageHeader>
+      <PageHeader title="Dashboard - Vue Globale" subtitle="Pilotage des ressources et detection des anomalies de staffing" />
 
       {/* KPI Strip */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: '12px' }}>
@@ -123,7 +98,7 @@ export function Dashboard() {
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
 
         {/* Staffing trend line chart */}
-        <SectionCard title="Évolution du Taux de Staffing" subtitle="6 derniers mois · Objectif cible : 90%" accent={C.purple}
+        <SectionCard title="Evolution du Taux de Staffing" subtitle="6 derniers mois - Objectif cible : 90%" accent={C.purple}
           actions={<span style={{ fontSize: '11px', fontWeight: 700, color: data.tauxStaffingGlobal >= 90 ? C.green : '#F59E0B', backgroundColor: data.tauxStaffingGlobal >= 90 ? '#ECFDF5' : '#FFF7ED', border: `1px solid ${data.tauxStaffingGlobal >= 90 ? '#A7F3D0' : '#FDE68A'}`, padding: '2px 8px', borderRadius: R, display: 'flex', alignItems: 'center', gap: '3px' }}><ArrowUpRight style={{ width: '11px', height: '11px' }} />{data.tauxStaffingGlobal}% ce mois</span>}>
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={data.staffingMensuel} margin={{ top: 4, right: 16, bottom: 0, left: -16 }}>
@@ -139,7 +114,7 @@ export function Dashboard() {
         </SectionCard>
 
         {/* Project distribution pie */}
-        <SectionCard title="Répartition Projets" subtitle={`${totalProjets} projets au total`} accent={C.magenta}>
+        <SectionCard title="Repartition Projets" subtitle={`${totalProjets} projets au total`} accent={C.magenta}>
           {totalProjets === 0 ? (
             <p style={{ fontSize: '12px', color: C.textMuted, textAlign: 'center', padding: '30px 0' }}>Aucun projet.</p>
           ) : (
@@ -177,7 +152,7 @@ export function Dashboard() {
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
 
         {/* Anomaly analysis bar chart */}
-        <SectionCard title="Analyse des Anomalies de Staffing" subtitle="Évolution sur 6 mois" accent={'#F59E0B'}>
+        <SectionCard title="Analyse des Anomalies de Staffing" subtitle="Evolution sur 6 mois" accent={'#F59E0B'}>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={data.anomaliesMensuelles} barSize={10} barCategoryGap="35%" margin={{ top: 4, right: 16, bottom: 0, left: -16 }}>
               <CartesianGrid strokeDasharray="4 4" stroke={C.borderLight} vertical={false} />

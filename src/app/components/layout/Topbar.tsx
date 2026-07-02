@@ -11,6 +11,7 @@ import {
   marquerCommeLue,
   type NotificationResponseDTO,
 } from '../../services/notificationService';
+import { getNotificationTarget } from '../../services/notificationRouting';
 
 const NOTIF_ROUTE: Record<string, string> = {
   rm: '/rm/notifications',
@@ -92,7 +93,7 @@ export function Topbar() {
         // Ignore local sync errors; navigation remains useful.
       }
     }
-    navigate(notifRoute);
+    navigate(getNotificationTarget(n, role));
   };
 
   return (

@@ -32,7 +32,7 @@ import {
 import { exportReportExcel, exportReportPdf } from '../../services/reportExportService';
 
 const STATUS_CFG: Record<string, { label: string; bg: string; text: string; dot: string }> = {
-  GENERE: { label: 'Genere', bg: '#ECFDF5', text: '#065F46', dot: C.green },
+  GENERE: { label: 'Généré', bg: '#ECFDF5', text: '#065F46', dot: C.green },
   SANS_ANOMALIE: { label: 'Sans anomalie', bg: '#EFF6FF', text: '#1D4ED8', dot: C.blue },
 };
 
@@ -40,23 +40,23 @@ const TYPE_CFG: Record<string, { label: string; color: string; bg: string; text:
   CONFLIT: { label: 'Conflit', color: C.red, bg: '#FEF2F2', text: '#B91C1C' },
   SURCHARGE: { label: 'Surcharge', color: '#F59E0B', bg: '#FFF7ED', text: '#92400E' },
   SOUS_CHARGE: { label: 'Sous-charge', color: C.blue, bg: '#EFF6FF', text: '#1D4ED8' },
-  NON_STAFFE: { label: 'Non staffe', color: '#6B7280', bg: '#F3F4F6', text: '#374151' },
+  NON_STAFFE: { label: 'Non staffé', color: '#6B7280', bg: '#F3F4F6', text: '#374151' },
 };
 
 const MONTHS = [
   '',
   'Janvier',
-  'Fevrier',
+  'Février',
   'Mars',
   'Avril',
   'Mai',
   'Juin',
   'Juillet',
-  'Aout',
+  'Août',
   'Septembre',
   'Octobre',
   'Novembre',
-  'Decembre',
+  'Décembre',
 ];
 
 function formatPct(value: number | null): string {
@@ -141,7 +141,7 @@ function ReportDetailModal({
               </span>
             </div>
             <p style={{ fontSize: '11px', color: C.textMuted }}>
-              {report.libellePeriode} · {report.nombreProjetsConcernes} projets · {report.nombreCollaborateursConcernes} collaborateurs concernes
+              {report.libellePeriode} · {report.nombreProjetsConcernes} projets · {report.nombreCollaborateursConcernes} collaborateurs concernés
             </p>
           </div>
           <button onClick={onClose} style={{ width: '28px', height: '28px', borderRadius: R, border: `1px solid ${C.border}`, backgroundColor: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -165,18 +165,18 @@ function ReportDetailModal({
           </div>
 
           <div style={{ padding: '10px 12px', backgroundColor: C.bg, borderRadius: R, border: `1px solid ${C.border}` }}>
-            <p style={{ fontSize: '10px', color: C.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '5px' }}>Projets concernes</p>
+            <p style={{ fontSize: '10px', color: C.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '5px' }}>Projets concernés</p>
             <p style={{ fontSize: '12px', color: C.textSecondary, lineHeight: 1.6 }}>
               {report.projetsConcernes.length ? report.projetsConcernes.join(' · ') : 'Aucun projet'}
             </p>
           </div>
 
           <div>
-            <p style={{ fontSize: '12px', fontWeight: 700, color: C.text, marginBottom: '8px' }}>Details des anomalies du mois</p>
+            <p style={{ fontSize: '12px', fontWeight: 700, color: C.text, marginBottom: '8px' }}>Détails des anomalies du mois</p>
             {report.anomalies.length === 0 ? (
               <div style={{ padding: '28px', textAlign: 'center', borderRadius: R, backgroundColor: '#ECFDF5', border: '1px solid #A7F3D0' }}>
                 <CheckCircle style={{ width: '30px', height: '30px', color: C.green, margin: '0 auto 8px' }} />
-                <p style={{ fontSize: '13px', fontWeight: 700, color: C.green }}>Aucune anomalie detectee pour cette periode.</p>
+                <p style={{ fontSize: '13px', fontWeight: 700, color: C.green }}>Aucune anomalie détectée pour cette période.</p>
               </div>
             ) : (
               <div style={{ overflowX: 'auto' }}>
@@ -243,7 +243,7 @@ export function PmReports() {
     try {
       const data = await fetchPmRapportsV2();
       setReports(data);
-      if (silent) toast.success('Rapports actualises !');
+      if (silent) toast.success('Rapports actualisés !');
     } catch (err: any) {
       const message = err.message || 'Impossible de charger les rapports V2.';
       setError(message);
@@ -265,7 +265,7 @@ export function PmReports() {
       .then(data => {
         setReports(data);
         setError('');
-        toast.success('Rapports actualises !', { id: 'reports-refresh' });
+        toast.success('Rapports actualisés !', { id: 'reports-refresh' });
       })
       .catch((err: any) => {
         const message = err.message || 'Impossible de charger les rapports V2.';
@@ -290,7 +290,7 @@ export function PmReports() {
 
   return (
     <div style={{ padding: '20px', backgroundColor: C.bg, minHeight: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      <PageHeader title="Rapports de Prevision V2" subtitle="Rapports mensuels generes depuis les imports V2 reels">
+      <PageHeader title="Rapports de Prévision V2" subtitle="Rapports mensuels générés depuis les imports V2 réels">
         <BtnPrimary onClick={refresh} disabled={refreshing}>
           {refreshing ? <Loader2 style={{ width: '12px', height: '12px', animation: 'spin 1s linear infinite' }} /> : <RefreshCw style={{ width: '12px', height: '12px' }} />}
           Actualiser tous
@@ -308,7 +308,7 @@ export function PmReports() {
           <p style={{ fontSize: '14px', fontWeight: 700, color: C.text }}>Erreur de chargement</p>
           <p style={{ fontSize: '12px', color: C.textMuted, marginTop: '4px' }}>{error}</p>
           <div style={{ marginTop: '14px' }}>
-            <BtnGhost onClick={() => loadReports()}>Reessayer</BtnGhost>
+            <BtnGhost onClick={() => loadReports()}>Réessayer</BtnGhost>
           </div>
         </div>
       ) : reports.length === 0 ? (
@@ -316,7 +316,7 @@ export function PmReports() {
           <FileText style={{ width: '36px', height: '36px', color: C.blue, margin: '0 auto 10px' }} />
           <p style={{ fontSize: '14px', fontWeight: 700, color: C.text }}>Aucun rapport disponible</p>
           <p style={{ fontSize: '12px', color: C.textMuted, marginTop: '4px' }}>
-            Importez une prevision V2 sur un de vos projets pour generer les rapports mensuels.
+            Importez une prévision V2 sur un de vos projets pour générer les rapports mensuels.
           </p>
         </div>
       ) : (
@@ -324,8 +324,8 @@ export function PmReports() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '12px' }}>
             {[
               { l: 'Rapports disponibles', v: reports.length, c: C.blue },
-              { l: 'Rapports generes', v: generated, c: C.green },
-              { l: 'Anomalies detectees', v: totalAnomalies, c: totalAnomalies > 0 ? C.red : C.green },
+              { l: 'Rapports générés', v: generated, c: C.green },
+              { l: 'Anomalies détectées', v: totalAnomalies, c: totalAnomalies > 0 ? C.red : C.green },
             ].map(s => (
               <div key={s.l} style={{ ...cardStyle, borderLeft: `3px solid ${s.c}`, padding: '12px 16px' }}>
                 <p style={{ fontSize: '10px', fontWeight: 600, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>{s.l}</p>
@@ -407,7 +407,7 @@ export function PmReports() {
                             style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 14px', borderRadius: R, border: `1px solid ${accent}40`, backgroundColor: `${accent}08`, color: accent, cursor: 'pointer', fontSize: '11px', fontWeight: 700 }}
                             onMouseEnter={e => (e.currentTarget.style.backgroundColor = `${accent}15`)}
                             onMouseLeave={e => (e.currentTarget.style.backgroundColor = `${accent}08`)}
-                          ><Eye style={{ width: '12px', height: '12px' }} />Voir le detail</button>
+                          ><Eye style={{ width: '12px', height: '12px' }} />Voir le détail</button>
 
                           <button onClick={() => handleExport('Excel', report)}
                             style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 14px', borderRadius: R, border: `1px solid ${C.border}`, backgroundColor: '#fff', color: C.textSecondary, cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}

@@ -1,4 +1,4 @@
-import { apiGet } from './api';
+import { apiGet, apiPut } from './api';
 
 /* ─── Types alignés sur les DTO backend ─── */
 
@@ -30,6 +30,12 @@ export interface CollabDashboardDTO {
   capaciteRestante: number;
   projetsBientotTermines: number;
   avancementMoyen: number;
+  totalTaches: number;
+  tachesTerminees: number;
+  tachesEnCours: number;
+  tachesBloquees: number;
+  tachesEnAttente: number;
+  avancementGlobalTaches: number;
   projets: CollabProjetDTO[];
   chargeMensuelle: ChargeMensuelleDTO[];
 }
@@ -47,7 +53,11 @@ export interface TacheJourDTO {
   projet: string;
   tache: string;
   ordreJour: number;
+  statut: StatutTache;
+  pourcentageAvancement: number;
 }
+
+export type StatutTache = 'EN_ATTENTE' | 'EN_COURS' | 'TERMINEE' | 'BLOQUEE';
 
 export interface TacheCollaborateurDTO {
   id: number;
@@ -61,6 +71,8 @@ export interface TacheCollaborateurDTO {
   ordreJour: number;
   dateDebutV2: string;
   dateFinV2: string;
+  statut: StatutTache;
+  pourcentageAvancement: number;
 }
 
 export interface CollabPlanningJourDTO {
@@ -93,4 +105,11 @@ export function fetchCollabTaches(annee?: number, mois?: number): Promise<TacheC
   if (mois) params.append('mois', String(mois));
   const query = params.toString();
   return apiGet<TacheCollaborateurDTO[]>(`/collaborateur/taches${query ? '?' + query : ''}`);
+}
+
+export function updateCollabTache(
+  id: number,
+  payload: { statut: StatutTache; pourcentageAvancement: number }
+): Promise<TacheCollaborateurDTO> {
+  return apiPut<TacheCollaborateurDTO>(`/collaborateur/taches/${id}`, payload);
 }

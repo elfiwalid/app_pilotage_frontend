@@ -40,7 +40,7 @@ export function MainLayout() {
             borderTopColor: '#7B2CBF', borderRadius: '50%',
             animation: 'spin 0.8s linear infinite', margin: '0 auto 12px',
           }} />
-          <p style={{ fontSize: '13px', color: '#6B7280', fontWeight: 500 }}>Chargement…</p>
+          <p style={{ fontSize: '13px', color: '#6B7280', fontWeight: 500 }}>Chargement...</p>
         </div>
       </div>
     );

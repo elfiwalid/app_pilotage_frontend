@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Play, RefreshCw, TrendingUp, TrendingDown, CheckCircle, ArrowRight, AlertCircle, AlertTriangle, XCircle, Loader2, UserPlus, Calendar } from 'lucide-react';
+import { useNavigate } from 'react-router';
+import { Play, RefreshCw, TrendingUp, TrendingDown, CheckCircle, ArrowRight, AlertCircle, AlertTriangle, XCircle, Loader2, UserPlus, Calendar, MessageSquare } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { toast } from 'sonner';
 import { C, R, S, SectionLabel, SectionCard, cardStyle } from '../../components/ui/design-system';
 import { fetchAffectationsCollab } from '../../services/anomalieV2Service';
+import { createConversationFromSimulation } from '../../services/conversationService';
 import type { SimulationSousChargeResponse } from '../../services/simulationService';
 import type { AnomalieV2DTO } from '../../services/anomalieV2Service';
 import type { RmProjetDTO, RmResourceDTO } from '../../services/resourceManagerService';
@@ -26,6 +28,7 @@ interface Props {
   onValidate: (id: number) => Promise<void>;
   onCancel: (id: number) => Promise<void>;
   onReset: () => void;
+  initialAnomalieId?: string;
 }
 
 const CT = ({ active, payload, label }: any) => {
@@ -38,14 +41,22 @@ const CT = ({ active, payload, label }: any) => {
   );
 };
 
-export function SousChargePanel({ sousCharges, projets, collaborateurs, rmId, annee, mois, loading, result, running, validated, error, onRun, onValidate, onCancel, onReset }: Props) {
+export function SousChargePanel({ sousCharges, projets, collaborateurs, rmId, annee, mois, loading, result, running, validated, error, onRun, onValidate, onCancel, onReset, initialAnomalieId }: Props) {
+  const navigate = useNavigate();
   const [anomalieId, setAnomalieId] = useState('');
   const [projId, setProjId] = useState('');
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
+  const [creatingConversation, setCreatingConversation] = useState(false);
   const [affectations, setAffectations] = useState<{ projetNom: string; dateDebut: string; dateFin: string; tauxAffectation: number }[]>([]);
 
-  useEffect(() => { if (sousCharges.length && !anomalieId) setAnomalieId(String(sousCharges[0].id)); }, [sousCharges]);
+  useEffect(() => {
+    if (initialAnomalieId && sousCharges.some(a => String(a.id) === initialAnomalieId)) {
+      setAnomalieId(initialAnomalieId);
+      return;
+    }
+    if (sousCharges.length && !anomalieId) setAnomalieId(String(sousCharges[0].id));
+  }, [sousCharges, initialAnomalieId]);
 
   const selectedAnomalie = sousCharges.find(a => String(a.id) === anomalieId);
   const cibleCollab = selectedAnomalie ? collaborateurs.find(c => c.matricule === selectedAnomalie.numeroEmploye) : null;
@@ -87,6 +98,16 @@ export function SousChargePanel({ sousCharges, projets, collaborateurs, rmId, an
   const startDayNum = start ? Number(start.split('-')[2]) : null;
   const endDayNum = end ? Number(end.split('-')[2]) : null;
 
+  const isDayAvailable = (d: number) => !isWknd(d) && (dailyLoad[d] || 0) === 0;
+  const isRangeAvailable = (from: number, to: number) => {
+    const min = Math.min(from, to);
+    const max = Math.max(from, to);
+    for (let d = min; d <= max; d++) {
+      if (!isDayAvailable(d)) return false;
+    }
+    return true;
+  };
+
   const formatDateStr = (dayNum: number) => {
     const mm = String(mois).padStart(2, '0');
     const dd = String(dayNum).padStart(2, '0');
@@ -94,7 +115,10 @@ export function SousChargePanel({ sousCharges, projets, collaborateurs, rmId, an
   };
 
   const handleDayClick = (d: number) => {
-    if (isWknd(d)) return;
+    if (!isDayAvailable(d)) {
+      toast.error('Selectionnez uniquement des jours disponibles');
+      return;
+    }
     const dateStr = formatDateStr(d);
     if (!start || (start && end)) {
       setStart(dateStr);
@@ -103,6 +127,11 @@ export function SousChargePanel({ sousCharges, projets, collaborateurs, rmId, an
       const startDate = new Date(start);
       const clickedDate = new Date(dateStr);
       if (clickedDate >= startDate) {
+        const selectedStartDay = Number(start.split('-')[2]);
+        if (!isRangeAvailable(selectedStartDay, d)) {
+          toast.error('Selectionnez uniquement des jours disponibles');
+          return;
+        }
         setEnd(dateStr);
       } else {
         setStart(dateStr);
@@ -115,6 +144,7 @@ export function SousChargePanel({ sousCharges, projets, collaborateurs, rmId, an
     const isWeekend = isWknd(d);
     const load = dailyLoad[d] || 0;
     const avail = Math.max(0, 100 - load);
+    const disabled = !isDayAvailable(d);
     const isSelected = startDayNum && (
       endDayNum ? (d >= startDayNum && d <= endDayNum) : (d === startDayNum)
     );
@@ -128,10 +158,11 @@ export function SousChargePanel({ sousCharges, projets, collaborateurs, rmId, an
       justifyContent: 'center',
       fontSize: '11px',
       fontWeight: 700,
-      cursor: isWeekend ? 'not-allowed' : 'pointer',
+      cursor: disabled ? 'not-allowed' : 'pointer',
       transition: 'all 0.15s',
       userSelect: 'none',
       border: isSelected ? `2px solid ${C.blue}` : '1px solid transparent',
+      opacity: disabled ? 0.62 : 1,
     };
 
     if (isWeekend) {
@@ -170,6 +201,11 @@ export function SousChargePanel({ sousCharges, projets, collaborateurs, rmId, an
     if (!selectedAnomalie || !cibleCollab || !projId || !start || !end || !rmId) {
       toast.error('Veuillez remplir tous les champs'); return;
     }
+    const startDay = Number(start.split('-')[2]);
+    const endDay = Number(end.split('-')[2]);
+    if (!isRangeAvailable(startDay, endDay)) {
+      toast.error('Selectionnez uniquement des jours disponibles'); return;
+    }
     toast.loading('Simulation en cours…', { id: 'sim-sc' });
     onRun({
       anomalieId: selectedAnomalie.id,
@@ -189,6 +225,20 @@ export function SousChargePanel({ sousCharges, projets, collaborateurs, rmId, an
     onValidate(result.simulationId)
       .then(() => toast.success('Scénario validé et appliqué !', { id: 'val-sc' }))
       .catch((e: any) => toast.error(e.message, { id: 'val-sc' }));
+  };
+
+  const handleCreateConversation = async () => {
+    if (!result || result.resultat !== 'POSITIF') return;
+    setCreatingConversation(true);
+    try {
+      const conversation = await createConversationFromSimulation(result.simulationId);
+      toast.success('Simulation envoyee au Chef de Projet');
+      navigate(`/conversations?conversationId=${conversation.id}`);
+    } catch (e: any) {
+      toast.error(e.message || 'Impossible de creer la conversation');
+    } finally {
+      setCreatingConversation(false);
+    }
   };
 
   const handleCancel = () => {
@@ -222,7 +272,7 @@ export function SousChargePanel({ sousCharges, projets, collaborateurs, rmId, an
               <UserPlus style={{ width: '14px', height: '14px', color: C.blue }} />
               <p style={{ fontSize: '13px', fontWeight: 700, color: C.text }}>Affecter un Sous-Chargé</p>
             </div>
-            <p style={{ fontSize: '10px', color: C.textMuted, marginTop: '2px' }}>Ajouter un collaborateur sous-chargé à un projet</p>
+            <p style={{ fontSize: '10px', color: C.textMuted, marginTop: '2px' }}>Ajouter une affectation à un collaborateur disposant encore de capacité.</p>
           </div>
           <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
@@ -324,8 +374,13 @@ export function SousChargePanel({ sousCharges, projets, collaborateurs, rmId, an
               {error && <p style={{ fontSize: '11px', color: C.red, padding: '4px 8px', backgroundColor: '#FEF2F2', borderRadius: R }}>{error}</p>}
               <div style={{ display: 'flex', gap: '6px' }}>
                 {result && !validated && (
-                  <button onClick={handleValidate} disabled={result.resultat === 'NEGATIF'} style={{ flex: 1, padding: '7px', borderRadius: R, border: 'none', backgroundColor: result.resultat === 'NEGATIF' ? '#D1D5DB' : C.green, color: '#fff', cursor: result.resultat === 'NEGATIF' ? 'not-allowed' : 'pointer', fontSize: '11px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+                  <button onClick={handleValidate} disabled={result.resultat !== 'POSITIF'} style={{ flex: 1, padding: '7px', borderRadius: R, border: 'none', backgroundColor: result.resultat !== 'POSITIF' ? '#D1D5DB' : C.green, color: '#fff', cursor: result.resultat !== 'POSITIF' ? 'not-allowed' : 'pointer', fontSize: '11px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
                     <CheckCircle style={{ width: '12px', height: '12px' }} />Valider
+                  </button>
+                )}
+                {result && result.resultat === 'POSITIF' && (
+                  <button onClick={handleCreateConversation} disabled={creatingConversation} style={{ flex: 1, padding: '7px', borderRadius: R, border: 'none', backgroundColor: C.purple, color: '#fff', cursor: creatingConversation ? 'not-allowed' : 'pointer', fontSize: '11px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+                    {creatingConversation ? <Loader2 style={{ width: '12px', height: '12px', animation: 'spin 1s linear infinite' }} /> : <MessageSquare style={{ width: '12px', height: '12px' }} />}Envoyer au Chef de Projet
                   </button>
                 )}
                 {result && !validated && (

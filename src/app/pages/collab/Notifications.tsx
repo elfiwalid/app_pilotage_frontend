@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router';
 import { Bell, CheckCircle, AlertCircle, Briefcase, FolderKanban, Clock, Check, Trash2, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { C, R, PageHeader, cardStyle } from '../../components/ui/design-system';
@@ -6,6 +7,7 @@ import {
   fetchMesNotifications, marquerCommeLue, marquerToutesCommeLues, supprimerNotification,
   type NotificationResponseDTO,
 } from '../../services/notificationService';
+import { getNotificationTarget } from '../../services/notificationRouting';
 
 const TYPE_CFG: Record<string, { label: string; bg: string; text: string; color: string; icon: any }> = {
   ANOMALIE: { label: 'Alerte', bg: '#FFF7ED', text: '#92400E', color: '#F59E0B', icon: AlertCircle },
@@ -31,6 +33,7 @@ function timeAgo(iso: string): string {
 }
 
 export function CollabNotifications() {
+  const navigate = useNavigate();
   const [notifs, setNotifs] = useState<NotificationResponseDTO[]>([]);
   const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(true);
@@ -71,6 +74,12 @@ export function CollabNotifications() {
   const del = async (id: number) => {
     try { await supprimerNotification(id); setNotifs(p => p.filter(n => n.id !== id)); toast.success('Notification supprimée.'); }
     catch (e: any) { toast.error(e.message || 'Erreur.'); }
+  };
+  const openNotification = async (n: NotificationResponseDTO) => {
+    if (!n.lu) {
+      await markRead(n.id);
+    }
+    navigate(getNotificationTarget(n, 'collab'));
   };
 
   if (loading) {
@@ -149,8 +158,8 @@ export function CollabNotifications() {
           const tc = TYPE_CFG[n.type] || TYPE_CFG.SYSTEME;
           const Icon = tc.icon;
           return (
-            <div key={n.id}
-              style={{ ...cardStyle, borderLeft: `4px solid ${n.lu ? C.borderLight : tc.color}`, backgroundColor: n.lu ? C.white : `${tc.color}04`, transition: 'all 0.12s' }}
+            <div key={n.id} onClick={() => openNotification(n)}
+              style={{ ...cardStyle, borderLeft: `4px solid ${n.lu ? C.borderLight : tc.color}`, backgroundColor: n.lu ? C.white : `${tc.color}04`, transition: 'all 0.12s', cursor: 'pointer' }}
               onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)')}
               onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)')}
             >
@@ -171,7 +180,7 @@ export function CollabNotifications() {
                 </div>
                 <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
                   {!n.lu && (
-                    <button onClick={() => markRead(n.id)}
+                    <button onClick={(e) => { e.stopPropagation(); markRead(n.id); }}
                       style={{ width: '28px', height: '28px', borderRadius: R, border: `1px solid ${C.border}`, backgroundColor: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                       title="Marquer comme lu"
                       onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#ECFDF5')} onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#fff')}
@@ -179,7 +188,7 @@ export function CollabNotifications() {
                       <Check style={{ width: '12px', height: '12px', color: C.green }} />
                     </button>
                   )}
-                  <button onClick={() => del(n.id)}
+                  <button onClick={(e) => { e.stopPropagation(); del(n.id); }}
                     style={{ width: '28px', height: '28px', borderRadius: R, border: `1px solid ${C.border}`, backgroundColor: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                     title="Supprimer"
                     onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#FEF2F2')} onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#fff')}

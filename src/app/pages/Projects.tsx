@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router';
 import { Search, Users, Calendar, Clock, CheckCircle, AlertCircle, ChevronRight, Loader2, AlertTriangle, RefreshCw, Download } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -94,10 +95,11 @@ function ProjectModal({ project, onClose }: { project: RmProjetDTO; onClose: () 
 
 /* ─── MAIN ─────────────────────────────────────── */
 export function Projects() {
+  const [searchParams] = useSearchParams();
   const [projets, setProjets] = useState<RmProjetDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(searchParams.get('search') || '');
   const [filterStatus, setFilterStatus] = useState('all');
   const [selected, setSelected] = useState<RmProjetDTO | null>(null);
   const [showExport, setShowExport] = useState(false);
@@ -117,6 +119,10 @@ export function Projects() {
   };
 
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    setSearch(searchParams.get('search') || '');
+  }, [searchParams]);
 
   const filtered = projets.filter(p => {
     const m = p.nom.toLowerCase().includes(search.toLowerCase()) || p.chefProjetNomComplet.toLowerCase().includes(search.toLowerCase());

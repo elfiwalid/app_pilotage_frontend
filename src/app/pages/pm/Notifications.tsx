@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router';
 import { Bell, CheckCircle, AlertTriangle, Briefcase, FolderKanban, Clock, Check, Trash2, Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { C, R, PageHeader, cardStyle } from '../../components/ui/design-system';
@@ -6,6 +7,7 @@ import {
   fetchMesNotifications, marquerCommeLue, marquerToutesCommeLues, supprimerNotification,
   type NotificationResponseDTO,
 } from '../../services/notificationService';
+import { getNotificationTarget } from '../../services/notificationRouting';
 
 const TYPE_CFG: Record<string, { label: string; bg: string; text: string; color: string; icon: any }> = {
   ANOMALIE: { label: 'Anomalie', bg: '#FEF2F2', text: '#B91C1C', color: C.red, icon: AlertTriangle },
@@ -31,6 +33,7 @@ function timeAgo(iso: string): string {
 }
 
 export function PmNotifications() {
+  const navigate = useNavigate();
   const [notifs, setNotifs] = useState<NotificationResponseDTO[]>([]);
   const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(true);
@@ -68,6 +71,12 @@ export function PmNotifications() {
   const del = async (id: number) => {
     try { await supprimerNotification(id); setNotifs(p => p.filter(n => n.id !== id)); }
     catch (e: any) { toast.error(e.message || 'Erreur.'); }
+  };
+  const openNotification = async (n: NotificationResponseDTO) => {
+    if (!n.lu) {
+      await markRead(n.id);
+    }
+    navigate(getNotificationTarget(n, 'pm'));
   };
 
   if (loading) {
@@ -137,7 +146,9 @@ export function PmNotifications() {
           const tc = TYPE_CFG[n.type] || TYPE_CFG.SYSTEME;
           const Icon = tc.icon;
           return (
-            <div key={n.id} style={{ ...cardStyle, borderLeft: `4px solid ${n.lu ? C.borderLight : tc.color}`, backgroundColor: n.lu ? '#fff' : `${tc.color}04` }}>
+            <div key={n.id} onClick={() => openNotification(n)} style={{ ...cardStyle, borderLeft: `4px solid ${n.lu ? C.borderLight : tc.color}`, backgroundColor: n.lu ? '#fff' : `${tc.color}04`, transition: 'box-shadow 0.15s', cursor: 'pointer' }}
+              onMouseEnter={e => ((e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)')}
+              onMouseLeave={e => ((e.currentTarget as HTMLDivElement).style.boxShadow = '0 1px 3px rgba(0,0,0,0.06)')}>
               <div style={{ padding: '12px 14px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
                 <div style={{ width: '34px', height: '34px', borderRadius: R, backgroundColor: `${tc.color}14`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <Icon style={{ width: '15px', height: '15px', color: tc.color }} />
@@ -153,12 +164,12 @@ export function PmNotifications() {
                 </div>
                 <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
                   {!n.lu && (
-                    <button onClick={() => markRead(n.id)} style={{ width: '27px', height: '27px', borderRadius: R, border: `1px solid ${C.border}`, backgroundColor: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    <button onClick={(e) => { e.stopPropagation(); markRead(n.id); }} style={{ width: '27px', height: '27px', borderRadius: R, border: `1px solid ${C.border}`, backgroundColor: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                       onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#ECFDF5')} onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#fff')} title="Marquer comme lu">
                       <Check style={{ width: '12px', height: '12px', color: C.green }} />
                     </button>
                   )}
-                  <button onClick={() => del(n.id)} style={{ width: '27px', height: '27px', borderRadius: R, border: `1px solid ${C.border}`, backgroundColor: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  <button onClick={(e) => { e.stopPropagation(); del(n.id); }} style={{ width: '27px', height: '27px', borderRadius: R, border: `1px solid ${C.border}`, backgroundColor: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                     onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#FEF2F2')} onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#fff')}>
                     <Trash2 style={{ width: '11px', height: '11px', color: C.red }} />
                   </button>

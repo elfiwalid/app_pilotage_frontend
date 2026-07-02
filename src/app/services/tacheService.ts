@@ -1,4 +1,6 @@
-import { getToken, apiFetch } from './api';
+import { getToken, apiFetch, apiGet } from './api';
+
+export type StatutTache = 'EN_ATTENTE' | 'EN_COURS' | 'TERMINEE' | 'BLOQUEE';
 
 export interface TacheCollaborateurDTO {
   id: number;
@@ -12,6 +14,8 @@ export interface TacheCollaborateurDTO {
   ordreJour: number;
   dateDebutV2: string;
   dateFinV2: string;
+  statut: StatutTache;
+  pourcentageAvancement: number;
 }
 
 export interface ImportTachesResponseDTO {
@@ -52,4 +56,8 @@ export async function importerTachesProjet(
   }
 
   return response.json();
+}
+
+export function fetchTachesProjet(projetId: number): Promise<TacheCollaborateurDTO[]> {
+  return apiGet<TacheCollaborateurDTO[]>(`/projets/${projetId}/taches`);
 }

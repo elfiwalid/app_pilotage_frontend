@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { AlertTriangle, Search, Mail, UserPlus, Eye, AlertCircle, TrendingUp, TrendingDown, Calendar, Users, CheckCircle, ArrowRight, ChevronLeft, ChevronRight, Clock, Play, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { C, R, PageHeader, BtnPrimary, BtnGhost, Avatar, Modal, ModalHeader, SectionLabel, cardStyle } from '../components/ui/design-system';
+import { C, S, R, PageHeader, BtnPrimary, BtnGhost, Avatar, Modal, ModalHeader, SectionLabel, cardStyle } from '../components/ui/design-system';
 import { fetchAnomaliesV2, lancerDetectionV2, type AnomalieV2DTO } from '../services/anomalieV2Service';
 
 /* ─── SEVERITY MAPPING ─── */
@@ -314,6 +314,12 @@ export function Conflicts() {
     }
   };
 
+  const goToSimulation = (a: AnomalieV2DTO) => {
+    const { isSurcharge } = getTypeLabel(a);
+    const mode = isSurcharge ? 'remplacement' : 'sous-charge';
+    navigate(`/simulation?conflictId=${a.id}&mode=${mode}&annee=${a.annee}&mois=${a.mois}`);
+  };
+
   const filtered = anomalies.filter(a => {
     const sev = getSeverity(a);
     const { isSurcharge } = getTypeLabel(a);
@@ -418,7 +424,11 @@ export function Conflicts() {
             const isNotified = notified.includes(a.id);
 
             return (
-              <div key={a.id} style={{ ...cardStyle, borderLeft: `4px solid ${sev.bar}` }}>
+              <div key={a.id}
+                onClick={() => goToSimulation(a)}
+                style={{ ...cardStyle, borderLeft: `4px solid ${sev.bar}`, cursor: 'pointer', transition: 'box-shadow 0.15s, transform 0.15s, background-color 0.15s' }}
+                onMouseEnter={e => { e.currentTarget.style.boxShadow = S.elevated; e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.backgroundColor = '#fff'; }}
+                onMouseLeave={e => { e.currentTarget.style.boxShadow = S.card; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.backgroundColor = C.white; }}>
                 <div style={{ padding: '14px 16px' }}>
                   <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
                     {/* Avatar */}
@@ -430,6 +440,9 @@ export function Conflicts() {
                         <p style={{ fontSize: '14px', fontWeight: 700, color: C.text }}>{a.collaborateurNom}</p>
                         <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '3px', backgroundColor: sev.bg, border: `1px solid ${sev.border}`, color: sev.text }}>{sev.label}</span>
                         <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '3px', backgroundColor: isSurcharge ? '#FEF2F2' : '#EFF6FF', color: isSurcharge ? '#B91C1C' : '#1D4ED8' }}>{typeLabel}</span>
+                        <span style={{ fontSize: '10px', fontWeight: 800, padding: '2px 7px', borderRadius: '3px', backgroundColor: `${C.purple}10`, border: `1px solid ${C.purple}30`, color: C.purple, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <UserPlus style={{ width: '10px', height: '10px' }} />Résoudre par simulation
+                        </span>
                       </div>
                       <p style={{ fontSize: '11px', color: C.textMuted, marginBottom: '8px' }}>#{a.numeroEmploye}</p>
 
@@ -486,8 +499,8 @@ export function Conflicts() {
                   </div>
 
                   {/* Actions */}
-                  <div style={{ display: 'flex', gap: '6px', marginTop: '12px', paddingTop: '12px', borderTop: `1px solid ${C.borderLight}` }}>
-                    <button onClick={() => notify(a)}
+                  <div onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: '6px', marginTop: '12px', paddingTop: '12px', borderTop: `1px solid ${C.borderLight}` }}>
+                    <button onClick={e => { e.stopPropagation(); notify(a); }}
                       style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 12px', borderRadius: R, border: `1px solid ${isNotified ? '#A7F3D0' : C.border}`, backgroundColor: isNotified ? '#ECFDF5' : '#fff', color: isNotified ? C.green : C.textSecondary, cursor: 'pointer', fontSize: '12px', fontWeight: 500 }}
                     >
                       {isNotified ? <CheckCircle style={{ width: '13px', height: '13px' }} /> : <Mail style={{ width: '13px', height: '13px' }} />}
@@ -495,8 +508,8 @@ export function Conflicts() {
                     </button>
                     <BtnGhost onClick={() => setSelected(a)} small><Eye style={{ width: '12px', height: '12px' }} />Voir les détails</BtnGhost>
                     {isSurcharge && (
-                      <BtnPrimary onClick={() => navigate(`/simulation?conflitId=${a.id}`)} small>
-                        <UserPlus style={{ width: '12px', height: '12px' }} />Proposer une ressource alternative
+                      <BtnPrimary onClick={() => goToSimulation(a)} small>
+                        <UserPlus style={{ width: '12px', height: '12px' }} />Résoudre par simulation
                       </BtnPrimary>
                     )}
                   </div>

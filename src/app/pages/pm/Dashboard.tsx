@@ -1,15 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Briefcase, Users, AlertTriangle, TrendingUp, ArrowUpRight, Activity, Calendar, RefreshCw, Sparkles } from 'lucide-react';
+import { Briefcase, Users, AlertTriangle, TrendingUp, ArrowUpRight, Activity, Sparkles } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
 import { C, S, R, PageHeader, SectionCard, KpiCard, cardStyle } from '../../components/ui/design-system';
 import { useNavigate } from 'react-router';
 import {
   fetchPmDashboard,
   DashboardChefProjetDTO,
-  AnomalieResumeeDTO,
-  ProjetResumeeDTO,
-  MoisAnomalieDTO,
-  MoisCollabDTO,
 } from '../../services/pmDashboardService';
 import { fetchResourceForecast, ResourceForecastResponse } from '../../services/mlForecastService';
 import { fetchPmRapportsV2, PmRapportMensuelDTO } from '../../services/pmReportsService';
@@ -23,8 +19,6 @@ const MOIS_OPTIONS = [
   { value: 9,  label: 'Septembre' }, { value: 10, label: 'Octobre' },
   { value: 11, label: 'Novembre' },  { value: 12, label: 'Décembre' },
 ];
-
-const ANNEE_OPTIONS = [2024, 2025, 2026, 2027];
 
 /* ─── TOOLTIP ──────────────────────────────────────── */
 const TIP = ({ active, payload, label }: any) => {
@@ -97,10 +91,9 @@ const getProjectDurationDays = (dateDebut: string, dateFin: string) => {
 export function PmDashboard() {
   const navigate = useNavigate();
 
-  /* ── Filtre période ── */
-  const now = new Date();
-  const [selAnnee, setSelAnnee] = useState(now.getFullYear());
-  const [selMois,  setSelMois]  = useState(now.getMonth() + 1);
+  const currentDate = new Date();
+  const currentMonth = currentDate.getMonth() + 1;
+  const currentYear = currentDate.getFullYear();
 
   /* ── Data ── */
   const [data, setData] = useState<DashboardChefProjetDTO | null>(null);
@@ -118,7 +111,7 @@ export function PmDashboard() {
     setError(null);
     try {
       const [d, reports] = await Promise.all([
-        fetchPmDashboard(selAnnee, selMois),
+        fetchPmDashboard(currentYear, currentMonth),
         fetchPmRapportsV2().catch(() => [] as PmRapportMensuelDTO[]),
       ]);
       setData(d);
@@ -130,7 +123,7 @@ export function PmDashboard() {
     }
   };
 
-  useEffect(() => { loadData(); }, [selAnnee, selMois]);
+  useEffect(() => { loadData(); }, [currentYear, currentMonth]);
 
   const forecastProjectOptions = Array.from(
     new Set(reportsV2.flatMap(report => report.projetsConcernes).map(project => project.trim()).filter(Boolean))
@@ -149,10 +142,10 @@ export function PmDashboard() {
       return;
     }
 
-    const selectedPeriodLabel = `${MOIS_OPTIONS.find(m => m.value === selMois)?.label || `Mois ${selMois}`} ${selAnnee}`;
+    const selectedPeriodLabel = `${MOIS_OPTIONS.find(m => m.value === currentMonth)?.label || `Mois ${currentMonth}`} ${currentYear}`;
     const isAllProjects = selectedForecastProject === ALL_FORECAST_PROJECTS;
     const selectedScopeLabel = isAllProjects ? 'Tous les projets' : selectedForecastProject;
-    const report = reportsV2.find(r => r.annee === selAnnee && r.mois === selMois);
+    const report = reportsV2.find(r => r.annee === currentYear && r.mois === currentMonth);
 
     if (!report) {
       setForecast(null);
@@ -179,7 +172,7 @@ export function PmDashboard() {
     if (collaboratorCount === 0 && nbAnomaliesTotal === 0) {
       setForecast(null);
       setForecastSourceLabel(`${report.libellePeriode} — ${selectedScopeLabel}`);
-      setForecastError(isAllProjects ? 'Données V2 insuffisantes pour la période sélectionnée' : 'Données V2 insuffisantes pour ce projet sur la période sélectionnée');
+      setForecastError(isAllProjects ? 'Données V2 insuffisantes pour le mois courant' : 'Données V2 insuffisantes pour ce projet sur le mois courant');
       setForecastLoading(false);
       return;
     }
@@ -223,11 +216,11 @@ export function PmDashboard() {
         setForecastError(e.message || 'Prévision indisponible');
       })
       .finally(() => setForecastLoading(false));
-  }, [data, reportsV2, selAnnee, selMois, selectedForecastProject]);
+  }, [data, reportsV2, currentYear, currentMonth, selectedForecastProject]);
 
   /* ── Derived helpers ── */
-  const moisLabel = MOIS_OPTIONS.find(m => m.value === selMois)?.label || '';
-  const periodeLabel = `${moisLabel} ${selAnnee}`;
+  const moisLabel = MOIS_OPTIONS.find(m => m.value === currentMonth)?.label || '';
+  const periodeLabel = `${moisLabel} ${currentYear}`;
 
   /* ── KPIs ── */
   const kpiData = data ? [
@@ -250,33 +243,7 @@ export function PmDashboard() {
     <div style={{ padding: '20px', backgroundColor: C.bg, minHeight: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
       {/* Header */}
-      <PageHeader title="Dashboard — Chef de Projet" subtitle={`Suivi de vos projets et gestion des anomalies · ${periodeLabel}`}>
-        {/* Filtre Mois / Année */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Calendar style={{ width: '14px', height: '14px', color: C.textMuted }} />
-          <select value={selMois} onChange={e => setSelMois(Number(e.target.value))} style={selectStyle}>
-            {MOIS_OPTIONS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-          </select>
-          <select value={selAnnee} onChange={e => setSelAnnee(Number(e.target.value))} style={selectStyle}>
-            {ANNEE_OPTIONS.map(a => <option key={a} value={a}>{a}</option>)}
-          </select>
-          <button
-            onClick={loadData}
-            disabled={loading}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '4px',
-              padding: '5px 10px', borderRadius: R,
-              border: `1px solid ${C.border}`, background: C.white,
-              color: C.textMuted, fontSize: '11px', fontWeight: 600,
-              cursor: loading ? 'not-allowed' : 'pointer',
-              opacity: loading ? 0.6 : 1,
-            }}
-          >
-            <RefreshCw style={{ width: '12px', height: '12px', animation: loading ? 'spin 1s linear infinite' : 'none' }} />
-          </button>
-          <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
-        </div>
-      </PageHeader>
+      <PageHeader title="Dashboard — Chef de Projet" subtitle={`Suivi de vos projets et gestion des anomalies · ${periodeLabel}`} />
 
       {/* Error */}
       {error && (
@@ -323,7 +290,7 @@ export function PmDashboard() {
         }
       >
         <p style={{ fontSize: '12px', color: C.textMuted, fontWeight: 600, marginBottom: '12px' }}>
-          Prédiction calculée à partir des collaborateurs concernés et des anomalies V2 du mois sélectionné, selon le périmètre projet choisi.
+          Prédiction calculée à partir des collaborateurs concernés et des anomalies V2 du mois courant, selon le périmètre projet choisi.
         </p>
         {forecastLoading ? (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '12px' }}>

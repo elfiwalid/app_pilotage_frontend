@@ -1,5 +1,3 @@
-import { apiGet, apiPost, apiDelete } from './api';
-
 export interface AffectationRequestDTO {
   projetId: number;
   collaborateurId: number;
@@ -22,23 +20,29 @@ export interface AffectationResponseDTO {
   roleDansProjet: string;
 }
 
+const LEGACY_AFFECTATION_MESSAGE =
+  "Le service d'affectations legacy est désactivé : aucun endpoint backend /affectations n'existe. Les affectations sont gérées par l'import V2.";
+
 /**
  * Crée une nouvelle affectation.
  */
 export function creerAffectation(data: AffectationRequestDTO): Promise<AffectationResponseDTO> {
-  return apiPost<AffectationResponseDTO>('/affectations', data);
+  void data;
+  return Promise.reject(new Error(LEGACY_AFFECTATION_MESSAGE));
 }
 
 /**
  * Liste les affectations pour un projet donné.
  */
 export function fetchAffectationsParProjet(projetId: number): Promise<AffectationResponseDTO[]> {
-  return apiGet<AffectationResponseDTO[]>(`/affectations/projet/${projetId}`);
+  void projetId;
+  return Promise.reject(new Error(LEGACY_AFFECTATION_MESSAGE));
 }
 
 /**
  * Supprime une affectation.
  */
 export function supprimerAffectation(id: number): Promise<void> {
-  return apiDelete<void>(`/affectations/${id}`);
+  void id;
+  return Promise.reject(new Error(LEGACY_AFFECTATION_MESSAGE));
 }

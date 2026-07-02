@@ -1,6 +1,6 @@
 import type { PmRapportMensuelDTO } from './pmReportsService';
 
-const MONTHS = ['', 'Janvier', 'Fevrier', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Aout', 'Septembre', 'Octobre', 'Novembre', 'Decembre'];
+const MONTHS = ['', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
 
 function safeFileName(value: string): string {
   return value.normalize('NFD')
@@ -35,17 +35,17 @@ function row(values: unknown[]): string {
 function worksheetXml(report: PmRapportMensuelDTO): string {
   const rows = [
     row([`Rapport V2 - ${report.libellePeriode}`]),
-    row(['Mois', MONTHS[report.mois], 'Annee', report.annee]),
+    row(['Mois', MONTHS[report.mois], 'Année', report.annee]),
     row([]),
     row(['Total anomalies', report.nombreTotalAnomalies]),
     row(['Conflits', report.nombreConflits]),
     row(['Surcharges', report.nombreSurcharges]),
     row(['Sous-charges', report.nombreSousCharges]),
-    row(['Non staffes', report.nombreNonStaffes]),
-    row(['Collaborateurs concernes', report.nombreCollaborateursConcernes]),
-    row(['Projets concernes', report.projetsConcernes.join(', ')]),
+    row(['Non staffés', report.nombreNonStaffes]),
+    row(['Collaborateurs concernés', report.nombreCollaborateursConcernes]),
+    row(['Projets concernés', report.projetsConcernes.join(', ')]),
     row([]),
-    row(['Collaborateur', 'Projet(s)', 'Type anomalie', 'Statut', 'Mois', 'Annee', 'Capacite mensuelle', 'Jours demandes', 'Taux charge', 'Message']),
+    row(['Collaborateur', 'Projet(s)', 'Type anomalie', 'Statut', 'Mois', 'Année', 'Capacité mensuelle', 'Jours demandés', 'Taux charge', 'Message']),
     ...report.anomalies.map(a => row([
       a.collaborateur,
       a.projetsConcernes,
@@ -196,13 +196,13 @@ function buildPdf(lines: string[]): Blob {
 export function exportReportPdf(report: PmRapportMensuelDTO): void {
   const lines = [
     `Rapport V2 - ${report.libellePeriode}`,
-    `Mois / annee : ${MONTHS[report.mois]} ${report.annee}`,
+    `Mois / année : ${MONTHS[report.mois]} ${report.annee}`,
     `Total anomalies : ${report.nombreTotalAnomalies}`,
-    `Conflits : ${report.nombreConflits} | Surcharges : ${report.nombreSurcharges} | Sous-charges : ${report.nombreSousCharges} | Non staffes : ${report.nombreNonStaffes}`,
-    `Collaborateurs concernes : ${report.nombreCollaborateursConcernes}`,
-    `Projets concernes : ${report.projetsConcernes.join(', ') || 'Aucun'}`,
+    `Conflits : ${report.nombreConflits} | Surcharges : ${report.nombreSurcharges} | Sous-charges : ${report.nombreSousCharges} | Non staffés : ${report.nombreNonStaffes}`,
+    `Collaborateurs concernés : ${report.nombreCollaborateursConcernes}`,
+    `Projets concernés : ${report.projetsConcernes.join(', ') || 'Aucun'}`,
     '',
-    'Anomalies detaillees',
+    'Anomalies détaillées',
     ...report.anomalies.map(a => [
       `${a.collaborateur || 'N/A'} | ${a.typeAnomalie} | ${a.tauxCharge}% | ${MONTHS[a.mois]} ${a.annee}`,
       `Projets: ${a.projetsConcernes || 'N/A'}`,

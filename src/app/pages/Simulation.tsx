@@ -32,9 +32,13 @@ const CT = ({ active, payload, label }: any) => {
 export function Simulation() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const conflitIdParam = searchParams.get('conflitId');
+  const conflitIdParam = searchParams.get('conflictId') || searchParams.get('conflitId');
   const conflitId = conflitIdParam ? Number(conflitIdParam) : null;
-  const isConflictMode = !!conflitId;
+  const modeParam = searchParams.get('mode');
+  const queryYear = searchParams.get('annee');
+  const queryMonth = searchParams.get('mois');
+  const isSousChargeLink = modeParam === 'sous-charge';
+  const isConflictMode = !!conflitId && !isSousChargeLink;
   const {
     mode, switchMode,
     state, result, running, validated, error,
@@ -74,6 +78,15 @@ export function Simulation() {
   }, [collaborateurs, mode]);
 
   useEffect(() => {
+    if (queryYear && queryMonth) {
+      setPeriod(Number(queryYear), Number(queryMonth));
+    }
+    if (isSousChargeLink) {
+      switchMode('SOUS_CHARGE');
+    }
+  }, [queryYear, queryMonth, isSousChargeLink]);
+
+  useEffect(() => {
     if (!isConflictMode || !conflitId) return;
 
     setConflictLoading(true);
@@ -87,13 +100,17 @@ export function Simulation() {
       fetchCollaborateursDisponiblesConflit(conflitId),
     ])
       .then(([context, candidats]) => {
+        const candidatsCompatibles = candidats
+          .filter(candidat => candidat.id !== context.collaborateurSourceId)
+          .filter(candidat => candidat.tauxUtilisation < 100)
+          .sort((a, b) => a.tauxUtilisation - b.tauxUtilisation);
         setConflictContext(context);
-        setAvailableCandidats(candidats);
+        setAvailableCandidats(candidatsCompatibles);
         setStart(context.dateDebut);
         setEnd(context.dateFin);
         setAnomalieId(String(context.conflitId));
-        if (candidats.length > 0) {
-          setCibleId(String(candidats[0].id));
+        if (candidatsCompatibles.length > 0) {
+          setCibleId(String(candidatsCompatibles[0].id));
         }
         setPeriod(context.annee, context.mois);
       })
@@ -106,6 +123,7 @@ export function Simulation() {
   }, [conflitId]);
 
   const selectedAnomalie = conflits.find(a => String(a.id) === anomalieId);
+  const linkedAnomalie = state.anomalies.find(a => String(a.id) === String(conflitId || anomalieId));
   const selectedCandidatConflit = availableCandidats.find(c => String(c.id) === cibleId);
   const selectedCible = isConflictMode
     ? selectedCandidatConflit
@@ -292,6 +310,7 @@ export function Simulation() {
           onValidate={validate}
           onCancel={cancel}
           onReset={reset}
+          initialAnomalieId={isSousChargeLink && conflitId ? String(conflitId) : undefined}
         />
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '16px', alignItems: 'start' }}>
@@ -312,19 +331,25 @@ export function Simulation() {
             <div style={cardStyle}>
               <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.borderLight}` }}>
                 <p style={{ fontSize: '13px', fontWeight: 700, color: C.text }}>Remplacement de Collaborateur</p>
+                <p style={{ fontSize: '10px', color: C.textMuted, marginTop: '2px' }}>Remplacer un collaborateur en conflit ou en surcharge par une ressource disponible.</p>
+                {isConflictMode && linkedAnomalie && (
+                  <p style={{ fontSize: '10px', color: C.textSecondary, marginTop: '5px', fontWeight: 600 }}>
+                    Type : {linkedAnomalie.typeAnomalie} · Charge actuelle : {linkedAnomalie.tauxCharge}% · {MOIS[linkedAnomalie.mois]} {linkedAnomalie.annee}
+                  </p>
+                )}
               </div>
               <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
-                {/* Anomalie / Collaborateur source */}
+                {/* Collaborateur source */}
                 <div>
-                  <SectionLabel>Anomalie (Collaborateur source)</SectionLabel>
+                  <SectionLabel>Collaborateur en conflit</SectionLabel>
                   {isConflictMode ? (
                     <div style={{ marginTop: '6px', padding: '8px 10px', borderRadius: R, backgroundColor: '#FEF2F2', border: '1px solid #FECACA', borderLeft: `3px solid ${C.red}` }}>
                       {conflictLoading ? <p style={{ fontSize: '11px', color: C.textMuted }}>Chargement du conflit...</p> : conflictContext ? (
                         <>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', gap: '8px' }}>
                             <div>
-                              <p style={{ fontSize: '11px', fontWeight: 700, color: '#B91C1C' }}>{conflictContext.collaborateurSourceNomComplet}</p>
+                              <p style={{ fontSize: '11px', fontWeight: 700, color: '#B91C1C' }}>Collaborateur en conflit : {conflictContext.collaborateurSourceNomComplet}</p>
                               <p style={{ fontSize: '10px', color: '#DC2626' }}>#{conflictContext.matricule} · {conflictContext.joursEnConflit} jours en conflit</p>
                             </div>
                             <span style={{ fontSize: '15px', fontWeight: 800, color: C.red }}>{conflictContext.tauxCharge}%</span>
@@ -344,7 +369,7 @@ export function Simulation() {
                   {!isConflictMode && selectedAnomalie && (
                     <div style={{ marginTop: '6px', padding: '8px 10px', borderRadius: R, backgroundColor: '#FEF2F2', border: '1px solid #FECACA', borderLeft: `3px solid ${C.red}` }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                        <div><p style={{ fontSize: '11px', fontWeight: 700, color: '#B91C1C' }}>{selectedAnomalie.collaborateurNom}</p><p style={{ fontSize: '10px', color: '#DC2626' }}>{selectedAnomalie.projetsConcernes}</p></div>
+                        <div><p style={{ fontSize: '11px', fontWeight: 700, color: '#B91C1C' }}>Collaborateur en conflit : {selectedAnomalie.collaborateurNom}</p><p style={{ fontSize: '10px', color: '#DC2626' }}>{selectedAnomalie.projetsConcernes}</p></div>
                         <span style={{ fontSize: '15px', fontWeight: 800, color: C.red }}>{selectedAnomalie.tauxCharge}%</span>
                       </div>
                       <div style={{ height: '3px', borderRadius: '2px', backgroundColor: '#FECACA', overflow: 'hidden' }}>
@@ -357,10 +382,11 @@ export function Simulation() {
                 {/* Collaborateur cible */}
                 <div>
                   <SectionLabel>Collaborateur cible (remplaçant)</SectionLabel>
+                  <p style={{ fontSize: '11px', fontWeight: 700, color: C.purple, marginBottom: '5px' }}>Collaborateur remplaçant</p>
                   <Select value={cibleId} onValueChange={setCibleId}>
                     <SelectTrigger style={{ fontSize: '12px', borderRadius: R, height: '32px' }}><SelectValue placeholder="Sélectionner le remplaçant" /></SelectTrigger>
                     <SelectContent>
-                      {(isConflictMode ? availableCandidats : collaborateurs.filter(c => !selectedAnomalie || c.matricule !== selectedAnomalie.numeroEmploye)).map(c => <SelectItem key={c.id} value={String(c.id)}><span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ fontSize: '10px', fontWeight: 700, color: '#D97706', backgroundColor: '#FFF7ED', padding: '1px 5px', borderRadius: '3px' }}>{Math.round(c.tauxUtilisation)}%</span>{c.prenom} {c.nom}</span></SelectItem>)}
+                      {(isConflictMode ? availableCandidats : collaborateurs.filter(c => !selectedAnomalie || c.matricule !== selectedAnomalie.numeroEmploye)).map(c => <SelectItem key={c.id} value={String(c.id)}><span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ fontSize: '10px', fontWeight: 700, color: '#D97706', backgroundColor: '#FFF7ED', padding: '1px 5px', borderRadius: '3px' }}>{Math.round(c.tauxUtilisation)}%</span>{c.prenom} {c.nom}{isConflictMode && 'tauxApresSimulation' in c ? <span style={{ fontSize: '10px', color: C.textMuted }}>→ {Math.round(c.tauxApresSimulation)}%</span> : null}</span></SelectItem>)}
                     </SelectContent>
                   </Select>
                   {isConflictMode && !conflictLoading && availableCandidats.length === 0 && (
@@ -369,7 +395,7 @@ export function Simulation() {
                   {selectedCible && (
                     <div style={{ marginTop: '6px', padding: '8px 10px', borderRadius: R, backgroundColor: '#F0FDF4', border: '1px solid #A7F3D0', borderLeft: `3px solid ${C.green}` }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                        <div><p style={{ fontSize: '11px', fontWeight: 700, color: '#065F46' }}>{selectedCible.prenom} {selectedCible.nom}</p><p style={{ fontSize: '10px', color: C.green }}>{selectedCible.poste}</p></div>
+                        <div><p style={{ fontSize: '11px', fontWeight: 700, color: '#065F46' }}>Remplaçant : {selectedCible.prenom} {selectedCible.nom}</p><p style={{ fontSize: '10px', color: C.green }}>{selectedCible.poste}{isConflictMode && 'tauxApresSimulation' in selectedCible ? ` · après simulation ${Math.round(selectedCible.tauxApresSimulation)}%` : ''}</p></div>
                         <span style={{ fontSize: '15px', fontWeight: 800, color: C.green }}>{Math.round(selectedCible.tauxUtilisation)}%</span>
                       </div>
                       <div style={{ height: '3px', borderRadius: '2px', backgroundColor: '#A7F3D0', overflow: 'hidden' }}>
@@ -439,9 +465,9 @@ export function Simulation() {
                         <CheckCircle style={{ width: '12px', height: '12px' }} />Valider
                       </button>
                     )}
-                    {result && !validated && isConflictMode && isRemplacementResult(result) && result.resultat === 'POSITIF' && (
+                    {result && !validated && isRemplacementResult(result) && result.resultat === 'POSITIF' && (
                       <button onClick={handleCreateConversation} disabled={creatingConversation} style={{ flex: 1, padding: '7px', borderRadius: R, border: 'none', backgroundColor: C.purple, color: '#fff', cursor: creatingConversation ? 'not-allowed' : 'pointer', fontSize: '11px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
-                        {creatingConversation ? <Loader2 style={{ width: '12px', height: '12px', animation: 'spin 1s linear infinite' }} /> : <MessageSquare style={{ width: '12px', height: '12px' }} />}Envoyer aux chefs
+                        {creatingConversation ? <Loader2 style={{ width: '12px', height: '12px', animation: 'spin 1s linear infinite' }} /> : <MessageSquare style={{ width: '12px', height: '12px' }} />}Envoyer au Chef de Projet
                       </button>
                     )}
                     {result && !validated && (

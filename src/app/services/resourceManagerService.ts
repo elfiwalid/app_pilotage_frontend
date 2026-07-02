@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiFetch } from './api';
+import { apiDelete, apiGet, apiPost, apiFetch } from './api';
 
 export interface ProjetAffecteDTO {
   projetId: number;
@@ -46,6 +46,10 @@ export function fetchRmResources(annee?: number, mois?: number): Promise<RmResou
   if (mois) params.append('mois', String(mois));
   const query = params.toString();
   return apiGet<RmResourceDTO[]>(`/rm/resources${query ? '?' + query : ''}`);
+}
+
+export function supprimerRmResource(collaborateurId: number): Promise<void> {
+  return apiDelete<void>(`/rm/resources/${collaborateurId}`);
 }
 
 /* ─── Dashboard RM ─── */

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Briefcase, Clock, CheckSquare, ArrowUpRight, TrendingUp, Loader2, AlertTriangle, RefreshCw, Calendar } from 'lucide-react';
+import { Briefcase, Clock, CheckSquare, ArrowUpRight, TrendingUp, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
 import { RadialBarChart, RadialBar, PolarAngleAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { C, S, R, PageHeader, SectionCard, KpiCard } from '../../components/ui/design-system';
 import { useNavigate } from 'react-router';
@@ -40,9 +40,9 @@ export function CollabDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const now = new Date();
-  const [selAnnee, setSelAnnee] = useState(now.getFullYear());
-  const [selMois, setSelMois] = useState(now.getMonth() + 1);
+  const currentDate = new Date();
+  const currentMonth = currentDate.getMonth() + 1;
+  const currentYear = currentDate.getFullYear();
 
   const MOIS_LABELS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
 
@@ -50,7 +50,7 @@ export function CollabDashboard() {
     setLoading(true);
     setError(null);
     try {
-      const d = await fetchCollabDashboard(selAnnee, selMois);
+      const d = await fetchCollabDashboard(currentYear, currentMonth);
       setData(d);
     } catch (err: any) {
       setError(err.message || 'Impossible de charger le dashboard.');
@@ -59,7 +59,7 @@ export function CollabDashboard() {
     }
   };
 
-  useEffect(() => { load(); }, [selAnnee, selMois]);
+  useEffect(() => { load(); }, [currentYear, currentMonth]);
 
   if (loading) {
     return (
@@ -87,7 +87,7 @@ export function CollabDashboard() {
     );
   }
 
-  const periodeLabel = `${MOIS_LABELS[selMois - 1]} ${selAnnee}`;
+  const periodeLabel = `${MOIS_LABELS[currentMonth - 1]} ${currentYear}`;
   const projetsActifs = data.projets.filter(p => p.statut === 'EN_COURS');
 
   // KPIs
@@ -97,8 +97,23 @@ export function CollabDashboard() {
     { title: 'Échéances Proches', value: String(data.projetsBientotTermines), trendPositive: true, icon: CheckSquare, accent: C.blue, sub: 'sous 30 jours' },
     { title: 'Avancement Moyen', value: `${data.avancementMoyen}%`, trendPositive: true, icon: ArrowUpRight, accent: C.purple, sub: 'projets actifs' },
   ];
+  const taskKpis = [
+    { title: 'Total Tâches', value: String(data.totalTaches ?? 0), trendPositive: true, icon: CheckSquare, accent: C.blue, sub: 'mois courant' },
+    { title: 'Terminées', value: String(data.tachesTerminees ?? 0), trendPositive: true, icon: CheckSquare, accent: C.green, sub: 'tâches livrées' },
+    { title: 'En Cours', value: String(data.tachesEnCours ?? 0), trendPositive: true, icon: Clock, accent: C.purple, sub: 'en progression' },
+    { title: 'Bloquées', value: String(data.tachesBloquees ?? 0), trendPositive: (data.tachesBloquees ?? 0) === 0, icon: AlertTriangle, accent: C.red, sub: `${data.avancementGlobalTaches ?? 0}% global` },
+  ];
 
   // Charge mensuelle → bar chart (6 prochains mois)
+  void taskKpis;
+  const visibleTaskKpis = [
+    { title: 'Total Taches', value: String(data.totalTaches ?? 0), trendPositive: true, icon: CheckSquare, accent: C.blue, sub: `${data.avancementGlobalTaches ?? 0}% global` },
+    { title: 'Terminees', value: String(data.tachesTerminees ?? 0), trendPositive: true, icon: CheckSquare, accent: C.green, sub: 'taches livrees' },
+    { title: 'En Cours', value: String(data.tachesEnCours ?? 0), trendPositive: true, icon: Clock, accent: '#D97706', sub: 'en progression' },
+    { title: 'Bloquees', value: String(data.tachesBloquees ?? 0), trendPositive: (data.tachesBloquees ?? 0) === 0, icon: AlertTriangle, accent: C.red, sub: 'a traiter' },
+    { title: 'En attente', value: String(data.tachesEnAttente ?? 0), trendPositive: true, icon: Clock, accent: C.textMuted, sub: 'a demarrer' },
+  ];
+
   const monthly = data.chargeMensuelle.slice(0, 6).map(m => ({
     mois: m.mois,
     charge: m.tauxCharge,
@@ -111,27 +126,15 @@ export function CollabDashboard() {
     <div style={{ padding: '20px', backgroundColor: C.bg, minHeight: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
       {/* Header */}
-      <PageHeader title="Mon Dashboard" subtitle={`Vue personnelle de vos projets et tâches · ${user?.name ?? ''} · ${periodeLabel}`}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Calendar style={{ width: '14px', height: '14px', color: C.textMuted }} />
-          <select value={selMois} onChange={e => setSelMois(Number(e.target.value))}
-            style={{ padding: '5px 8px', fontSize: '12px', fontWeight: 600, border: `1px solid ${C.border}`, borderRadius: R, backgroundColor: '#fff', cursor: 'pointer', outline: 'none' }}>
-            {MOIS_LABELS.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
-          </select>
-          <select value={selAnnee} onChange={e => setSelAnnee(Number(e.target.value))}
-            style={{ padding: '5px 8px', fontSize: '12px', fontWeight: 600, border: `1px solid ${C.border}`, borderRadius: R, backgroundColor: '#fff', cursor: 'pointer', outline: 'none' }}>
-            {[2025, 2026, 2027, 2028].map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
-          <button onClick={load} disabled={loading}
-            style={{ display: 'flex', alignItems: 'center', padding: '5px 10px', borderRadius: R, border: `1px solid ${C.border}`, background: '#fff', color: C.textMuted, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1 }}>
-            <RefreshCw style={{ width: '12px', height: '12px', animation: loading ? 'spin 1s linear infinite' : 'none' }} />
-          </button>
-        </div>
-      </PageHeader>
+      <PageHeader title="Mon Dashboard" subtitle={`Vue personnelle de vos projets et tâches · ${periodeLabel}`} />
 
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '12px' }}>
         {kpiData.map(k => <KpiCard key={k.title} label={k.title} value={k.value} sub={k.sub} trendPositive={k.trendPositive} icon={k.icon} accent={k.accent} />)}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: '12px' }}>
+        {visibleTaskKpis.map(k => <KpiCard key={k.title} label={k.title} value={k.value} sub={k.sub} trendPositive={k.trendPositive} icon={k.icon} accent={k.accent} />)}
       </div>
 
       {/* Main content */}

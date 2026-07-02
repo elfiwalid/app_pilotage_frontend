@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import {
   LayoutDashboard, Users, FolderKanban, AlertTriangle,
   Lightbulb, Settings, BookOpen, Briefcase, BarChart2,
-  Calendar, Bell, UserCircle, Upload, MessageSquare,
+  Calendar, Bell, UserCircle, MessageSquare,
 } from 'lucide-react';
 import { C, R } from '../ui/design-system';
 import { useRole, type Role } from '../../context/RoleContext';
@@ -51,7 +51,6 @@ export function Sidebar() {
         label: 'Gestion', items: [
           { name: 'Ressources', href: '/resources', icon: Users },
           { name: 'Projets', href: '/projects', icon: FolderKanban },
-          { name: 'Import Excel', href: '/import', icon: Upload },
           { name: 'Conflits', href: '/conflicts', icon: AlertTriangle, badge: counts.anomalies },
         ],
       },
