@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Mail, Lock, Eye, EyeOff, LogIn, AlertCircle, Shield } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
@@ -8,7 +8,7 @@ import { C, R, S } from '../components/ui/design-system';
 import logo from '../../imports/Logo_moderne_de_Staff2Staff_en_hexagone.png';
 
 export function Login() {
-  const { login } = useAuth();
+  const { login, isAuthenticated, user, loading: authLoading } = useAuth();
   const { setProfileFromUser } = useRole();
   const navigate = useNavigate();
 
@@ -19,6 +19,12 @@ export function Login() {
   const [loading, setLoading]   = useState(false);
   const [forgotMode, setForgotMode] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
+
+  useEffect(() => {
+    if (!authLoading && isAuthenticated && user) {
+      navigate(ROLE_DASHBOARDS[user.role], { replace: true });
+    }
+  }, [authLoading, isAuthenticated, user, navigate]);
 
   /* ── handle login form submission ── */
   const handleSubmit = async (e: React.FormEvent) => {
@@ -45,12 +51,12 @@ export function Login() {
       try {
         const user = JSON.parse(stored);
         setProfileFromUser(user);
-        navigate(ROLE_DASHBOARDS[user.role as keyof typeof ROLE_DASHBOARDS]);
+        navigate(ROLE_DASHBOARDS[user.role as keyof typeof ROLE_DASHBOARDS], { replace: true });
       } catch {
-        navigate('/');
+        navigate('/', { replace: true });
       }
     } else {
-      navigate('/');
+      navigate('/', { replace: true });
     }
 
     toast.success('Connexion réussie — Bienvenue sur Staff2Staff !');
@@ -76,6 +82,21 @@ export function Login() {
     textTransform: 'uppercase', letterSpacing: '0.06em',
     display: 'block', marginBottom: '5px',
   };
+
+  if (authLoading || (isAuthenticated && user)) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: C.bg }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            width: '36px', height: '36px', border: '3px solid #E5E7EB',
+            borderTopColor: C.purple, borderRadius: '50%',
+            animation: 'spin 0.8s linear infinite', margin: '0 auto 12px',
+          }} />
+          <p style={{ fontSize: '13px', color: C.textMuted, fontWeight: 500 }}>Chargement...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', backgroundColor: C.bg }}>

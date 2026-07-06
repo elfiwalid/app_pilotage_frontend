@@ -1,4 +1,5 @@
 import { Outlet, Navigate, useLocation } from 'react-router';
+import { useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { Toaster } from 'sonner';
@@ -29,6 +30,7 @@ function isRouteAllowed(pathname: string, role: 'rm' | 'pm' | 'collab'): boolean
 export function MainLayout() {
   const { isAuthenticated, loading, user } = useAuth();
   const location = useLocation();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Show nothing while restoring session from localStorage
   if (loading) {
@@ -56,75 +58,14 @@ export function MainLayout() {
 
   return (
     <div className="s2s-shell" style={{ display: 'flex', height: '100vh', overflow: 'hidden', backgroundColor: '#F0F2F6' }}>
-      <Sidebar />
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      {sidebarOpen && <div className="s2s-sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
       <div className="s2s-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
-        <Topbar />
+        <Topbar onMenuClick={() => setSidebarOpen(true)} />
         <main className="s2s-main" style={{ flex: 1, overflowY: 'auto' }}>
           <Outlet />
         </main>
       </div>
-      <style>{`
-        .s2s-main * {
-          min-width: 0;
-        }
-
-        @media (max-width: 1100px) {
-          .s2s-main [style*="repeat(5,1fr)"],
-          .s2s-main [style*="repeat(5, 1fr)"],
-          .s2s-main [style*="repeat(4,1fr)"],
-          .s2s-main [style*="repeat(4, 1fr)"],
-          .s2s-main [style*="2fr 1fr"],
-          .s2s-main [style*="1fr 1fr"] {
-            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-          }
-        }
-
-        @media (max-width: 760px) {
-          .s2s-shell {
-            overflow-x: hidden !important;
-          }
-          .s2s-sidebar {
-            width: 58px !important;
-          }
-          .s2s-sidebar-brand,
-          .s2s-sidebar-group-label,
-          .s2s-sidebar-item-label,
-          .s2s-sidebar-help {
-            display: none !important;
-          }
-          .s2s-topbar {
-            padding: 0 10px !important;
-          }
-          .s2s-user-menu-text {
-            display: none !important;
-          }
-          .s2s-topbar-menu {
-            max-width: calc(100vw - 76px) !important;
-          }
-          .s2s-main > div {
-            padding: 12px !important;
-          }
-          .s2s-main [style*="repeat(5,1fr)"],
-          .s2s-main [style*="repeat(5, 1fr)"],
-          .s2s-main [style*="repeat(4,1fr)"],
-          .s2s-main [style*="repeat(4, 1fr)"],
-          .s2s-main [style*="2fr 1fr"],
-          .s2s-main [style*="1fr 1fr"],
-          .s2s-main [style*="340px 1fr"],
-          .s2s-main [style*="320px 1fr"],
-          .s2s-main [style*="300px 1fr"] {
-            grid-template-columns: 1fr !important;
-          }
-          .s2s-main table {
-            min-width: 720px;
-          }
-          .s2s-main table,
-          .s2s-main thead,
-          .s2s-main tbody {
-            max-width: 100%;
-          }
-        }
-      `}</style>
       <Toaster
         position="top-right"
         richColors

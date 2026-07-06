@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Bell, ChevronDown, LogOut, User, Shield } from 'lucide-react';
+import { Bell, ChevronDown, LogOut, User, Shield, Menu } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { C, S, R } from '../ui/design-system';
@@ -43,7 +43,7 @@ function timeAgo(iso: string): string {
   }
 }
 
-export function Topbar() {
+export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
   const { role, profile } = useRole();
   const { logout } = useAuth();
   const navigate = useNavigate();
@@ -97,8 +97,17 @@ export function Topbar() {
   };
 
   return (
-    <header className="s2s-topbar" style={{ height: '52px', backgroundColor: C.white, borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '0 20px', flexShrink: 0, zIndex: 20, position: 'relative', gap: '12px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+    <header className="s2s-topbar" style={{ height: '52px', backgroundColor: C.white, borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', flexShrink: 0, zIndex: 20, position: 'relative', gap: '12px' }}>
+      <button
+        type="button"
+        className="s2s-mobile-menu-button"
+        onClick={onMenuClick}
+        aria-label="Ouvrir la navigation"
+        style={{ width: '38px', height: '38px', borderRadius: R, border: `1px solid ${C.border}`, backgroundColor: C.white, cursor: 'pointer', alignItems: 'center', justifyContent: 'center' }}
+      >
+        <Menu style={{ width: '18px', height: '18px', color: C.text }} />
+      </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, marginLeft: 'auto' }}>
         <div style={{ width: '1px', height: '20px', backgroundColor: C.border }} />
 
         <div style={{ position: 'relative' }}>

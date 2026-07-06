@@ -13,7 +13,7 @@ import { fetchMesNotifications } from '../../services/notificationService';
 
 const ROLE_ACCENT: Record<Role, string> = { rm: '#E600A9', pm: '#2D9CDB', collab: '#059669' };
 
-export function Sidebar() {
+export function Sidebar({ isOpen = false, onClose }: { isOpen?: boolean; onClose?: () => void }) {
   const { role } = useRole();
   const navigate = useNavigate();
   const location = useLocation();
@@ -110,7 +110,7 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="s2s-sidebar" style={{
+    <aside className={`s2s-sidebar ${isOpen ? 's2s-sidebar-open' : ''}`} style={{
       width: '224px', backgroundColor: C.sidebar,
       display: 'flex', flexDirection: 'column',
       flexShrink: 0, height: '100vh',
@@ -143,6 +143,7 @@ export function Sidebar() {
                   key={item.name}
                   to={item.href}
                   end={item.href === '/' || item.href === '/pm' || item.href === '/collab'}
+                  onClick={onClose}
                   style={{
                     display: 'flex', alignItems: 'center', gap: '9px',
                     padding: '7px 10px', borderRadius: R, marginBottom: '1px',

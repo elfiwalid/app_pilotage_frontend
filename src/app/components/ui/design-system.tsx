@@ -46,9 +46,9 @@ export function PageHeader({
   title, subtitle, badge, children,
 }: { title: string; subtitle?: string; badge?: ReactNode; children?: ReactNode }) {
   return (
-    <div style={{ ...cardStyle, borderLeft: `4px solid ${C.magenta}` }}>
-      <div className="flex items-center justify-between px-6 py-4">
-        <div className="flex items-center gap-4">
+    <div className="s2s-page-header" style={{ ...cardStyle, borderLeft: `4px solid ${C.magenta}` }}>
+      <div className="s2s-page-header-inner flex items-center justify-between px-6 py-4">
+        <div className="s2s-page-header-title flex items-center gap-4">
           <div>
             {badge && <div className="mb-1">{badge}</div>}
             <h1 style={{ fontSize: '1.125rem', fontWeight: 700, color: C.text, letterSpacing: '-0.01em' }}>
@@ -57,7 +57,7 @@ export function PageHeader({
             {subtitle && <p style={{ fontSize: '12px', color: C.textMuted, marginTop: '2px' }}>{subtitle}</p>}
           </div>
         </div>
-        {children && <div className="flex items-center gap-2">{children}</div>}
+        {children && <div className="s2s-page-header-actions flex items-center gap-2">{children}</div>}
       </div>
     </div>
   );
@@ -68,18 +68,18 @@ export function SectionCard({
   title, subtitle, accent = C.purple, actions, children, noPad = false,
 }: { title: string; subtitle?: string; accent?: string; actions?: ReactNode; children: ReactNode; noPad?: boolean }) {
   return (
-    <div style={cardStyle}>
-      <div className="flex items-center justify-between px-5 py-3.5" style={{ borderBottom: `1px solid ${C.borderLight}` }}>
-        <div className="flex items-center gap-3">
+    <div className="s2s-section-card" style={cardStyle}>
+      <div className="s2s-section-card-header flex items-center justify-between px-5 py-3.5" style={{ borderBottom: `1px solid ${C.borderLight}` }}>
+        <div className="s2s-section-card-title flex items-center gap-3">
           <div style={{ width: '3px', height: '18px', backgroundColor: accent, borderRadius: '2px', flexShrink: 0 }} />
           <div>
             <p style={{ fontSize: '13px', fontWeight: 600, color: C.text }}>{title}</p>
             {subtitle && <p style={{ fontSize: '11px', color: C.textMuted, marginTop: '1px' }}>{subtitle}</p>}
           </div>
         </div>
-        {actions && <div className="flex items-center gap-2">{actions}</div>}
+        {actions && <div className="s2s-section-card-actions flex items-center gap-2">{actions}</div>}
       </div>
-      <div className={noPad ? '' : 'p-5'}>{children}</div>
+      <div className={noPad ? 's2s-section-card-body' : 's2s-section-card-body p-5'}>{children}</div>
     </div>
   );
 }
@@ -242,10 +242,10 @@ export function Modal({ onClose, children, maxWidth = '520px', accentColor = C.m
   onClose: () => void; children: ReactNode; maxWidth?: string; accentColor?: string;
 }) {
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
+    <div className="s2s-modal-backdrop" style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
       onClick={onClose}>
       <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }} />
-      <div style={{
+      <div className="s2s-modal-panel" style={{
         position: 'relative', backgroundColor: '#fff',
         width: '100%', maxWidth, maxHeight: '90vh', overflowY: 'auto',
         borderRadius: R, boxShadow: S.modal,

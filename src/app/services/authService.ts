@@ -42,6 +42,46 @@ const GRADIENT_MAP: Record<string, string> = {
   collab: 'linear-gradient(135deg,#065F46,#059669)',
 };
 
+const VALID_ROLES: AuthUser['role'][] = ['rm', 'pm', 'collab'];
+
+function clearStoredSession(): void {
+  removeToken();
+  localStorage.removeItem('s2s_user');
+}
+
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  const [, payload] = token.split('.');
+  if (!payload) return null;
+
+  try {
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+    return JSON.parse(atob(padded)) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function isTokenExpired(token: string): boolean {
+  const payload = decodeJwtPayload(token);
+  const exp = payload?.exp;
+  if (typeof exp !== 'number') return true;
+
+  return exp * 1000 <= Date.now();
+}
+
+function isStoredAuthUser(value: unknown): value is AuthUser {
+  if (!value || typeof value !== 'object') return false;
+  const user = value as Partial<AuthUser>;
+  return (
+    typeof user.email === 'string' &&
+    typeof user.name === 'string' &&
+    typeof user.initials === 'string' &&
+    !!user.role &&
+    VALID_ROLES.includes(user.role)
+  );
+}
+
 /**
  * Build an AuthUser from the backend login response.
  */
@@ -81,28 +121,36 @@ export async function loginUser(email: string, password: string): Promise<AuthUs
  * Log the user out: clear all stored auth data.
  */
 export function logoutUser(): void {
-  removeToken();
-  localStorage.removeItem('s2s_user');
+  clearStoredSession();
 }
 
 /**
- * Restore a previously saved session (if the token is still present).
+ * Restore a previously saved session only if the JWT is still usable.
  */
 export function restoreSession(): AuthUser | null {
   const token = getToken();
   if (!token) return null;
 
+  if (isTokenExpired(token)) {
+    clearStoredSession();
+    return null;
+  }
+
   const stored = localStorage.getItem('s2s_user');
   if (!stored) {
-    removeToken();
+    clearStoredSession();
     return null;
   }
 
   try {
-    return JSON.parse(stored) as AuthUser;
+    const user = JSON.parse(stored);
+    if (!isStoredAuthUser(user)) {
+      clearStoredSession();
+      return null;
+    }
+    return user;
   } catch {
-    removeToken();
-    localStorage.removeItem('s2s_user');
+    clearStoredSession();
     return null;
   }
 }
